@@ -1,22 +1,27 @@
 <?php
-defined('BASEPATH') OR exit('No direct script access allowed');
 
-class Member extends CI_Controller {
-    public function __construct() {
+defined('BASEPATH') or exit('No direct script access allowed');
+
+class Member extends CI_Controller
+{
+    public function __construct()
+    {
         parent::__construct();
         $this->load->helper(['url', 'text']);
         $this->load->model(['Member_model', 'Poin_model']);
         $this->load->model('Voucher_model');
     }
 
-    private function check_login() {
+    private function check_login()
+    {
         if (!$this->session->userdata('member_id')) {
             header("Location: " . base_url('login'));
             exit;
         }
     }
 
-    public function index() {
+    public function index()
+    {
         $this->check_login();
         $data['title'] = "Dashboard Member";
 
@@ -38,7 +43,8 @@ class Member extends CI_Controller {
         $this->load->view('templates/footer', $data);
     }
 
-    public function logout() {
+    public function logout()
+    {
         $this->session->unset_userdata('member_id');
         header("Location: " . base_url('login'));
         exit;

@@ -97,7 +97,7 @@
                 } else {
                     echo '-';
                 }
-                ?>
+            ?>
             </p>
         </div>
         <h2>Stamp yang Dikumpulkan</h2>

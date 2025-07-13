@@ -141,13 +141,13 @@
                 </span>
                 <?php
                     $cukup = true;
-                    if ($item['jenis'] == 'poin' && $poin < $item['jumlah_dibutuhkan']) {
-                        $cukup = false;
-                    }
-                    if ($item['jenis'] == 'stamp' && $stamp_total < $item['jumlah_dibutuhkan']) {
-                        $cukup = false;
-                    }
-                    ?>
+            if ($item['jenis'] == 'poin' && $poin < $item['jumlah_dibutuhkan']) {
+                $cukup = false;
+            }
+            if ($item['jenis'] == 'stamp' && $stamp_total < $item['jumlah_dibutuhkan']) {
+                $cukup = false;
+            }
+            ?>
                     <?php if ($cukup): ?>
                         <a href="<?= site_url('redeem/process/' . $item['id']) ?>" class="redeem-btn redeem-trigger">Redeem</a>
                     <?php else: ?>
@@ -195,13 +195,13 @@
                 </span>
                 <?php
                     $cukup = true;
-                    if ($item['jenis'] == 'poin' && $poin < $item['jumlah_dibutuhkan']) {
-                        $cukup = false;
-                    }
-                    if ($item['jenis'] == 'stamp' && $stamp_total < $item['jumlah_dibutuhkan']) {
-                        $cukup = false;
-                    }
-                    ?>
+            if ($item['jenis'] == 'poin' && $poin < $item['jumlah_dibutuhkan']) {
+                $cukup = false;
+            }
+            if ($item['jenis'] == 'stamp' && $stamp_total < $item['jumlah_dibutuhkan']) {
+                $cukup = false;
+            }
+            ?>
                     <?php if ($cukup): ?>
                         <a href="<?= site_url('redeem/process/' . $item['id']) ?>" class="redeem-btn redeem-trigger">Redeem</a>
                     <?php else: ?>

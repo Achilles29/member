@@ -1,4 +1,5 @@
 <?php
+
 /**
  * CodeIgniter
  *
@@ -34,7 +35,7 @@
  * @since	Version 3.0.0
  * @filesource
  */
-defined('BASEPATH') OR exit('No direct script access allowed');
+defined('BASEPATH') or exit('No direct script access allowed');
 
 /**
  * CI_Session_driver_interface
@@ -47,14 +48,14 @@ defined('BASEPATH') OR exit('No direct script access allowed');
  * @author	Andrey Andreev
  * @link	https://codeigniter.com/userguide3/libraries/sessions.html
  */
-interface CI_Session_driver_interface {
-
-	public function open($save_path, $name);
-	public function close();
-	public function read($session_id);
-	public function write($session_id, $session_data);
-	public function destroy($session_id);
-	public function gc($maxlifetime);
-	public function updateTimestamp($session_id, $data);
-	public function validateId($session_id);
+interface CI_Session_driver_interface
+{
+    public function open($save_path, $name);
+    public function close();
+    public function read($session_id);
+    public function write($session_id, $session_data);
+    public function destroy($session_id);
+    public function gc($maxlifetime);
+    public function updateTimestamp($session_id, $data);
+    public function validateId($session_id);
 }

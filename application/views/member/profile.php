@@ -146,8 +146,8 @@
         <div class="mb-2"><input type="date" name="tanggal_lahir" class="form-control" value="<?= $member['tanggal_lahir'] ?>"></div>
         <div class="mb-2">
             <select name="jenis_kelamin" class="form-control">
-                <option value="Laki-laki" <?= $member['jenis_kelamin']=='Laki-laki'?'selected':'' ?>>Laki-laki</option>
-                <option value="Perempuan" <?= $member['jenis_kelamin']=='Perempuan'?'selected':'' ?>>Perempuan</option>
+                <option value="Laki-laki" <?= $member['jenis_kelamin'] == 'Laki-laki' ? 'selected' : '' ?>>Laki-laki</option>
+                <option value="Perempuan" <?= $member['jenis_kelamin'] == 'Perempuan' ? 'selected' : '' ?>>Perempuan</option>
             </select>
         </div>
         <div class="mb-2">

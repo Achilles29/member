@@ -1,16 +1,22 @@
 <?php
-defined('BASEPATH') OR exit('No direct script access allowed');
 
-class Card extends CI_Controller {
-    public function __construct() {
+defined('BASEPATH') or exit('No direct script access allowed');
+
+class Card extends CI_Controller
+{
+    public function __construct()
+    {
         parent::__construct();
         $this->load->model('Member_model');
         $this->load->model('Poin_model');
     }
 
-    public function index() {
+    public function index()
+    {
         $member_id = $this->session->userdata('member_id');
-        if (!$member_id) redirect('member');
+        if (!$member_id) {
+            redirect('member');
+        }
 
         $data['member'] = $this->Member_model->get_member_by_id($member_id);
         $data['poin'] = $this->Member_model->get_active_poin($member_id);
@@ -18,11 +24,13 @@ class Card extends CI_Controller {
 
         $this->load->view('member/card', $data);
     }
-    public function login() {
+    public function login()
+    {
         $this->load->view('member/login');
     }
 
-    public function do_login() {
+    public function do_login()
+    {
         $phone = $this->input->post('phone');
         $member = $this->Member_model->get_by_phone($phone);
 
@@ -35,9 +43,9 @@ class Card extends CI_Controller {
         }
     }
 
-    public function logout() {
+    public function logout()
+    {
         $this->session->unset_userdata('member_id');
         redirect('card/login');
     }
 }
-

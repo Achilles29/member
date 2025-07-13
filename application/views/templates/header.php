@@ -23,6 +23,7 @@
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     
+    <!-- <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"> -->
 
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -69,6 +70,14 @@
 <body>
 
 <div class="header">
-    <h2><?= $member['nama']; ?></h2>
-    <a href="<?= site_url('member/logout') ?>" title="Logout" style="color:#fff;"><i class="fas fa-sign-out-alt"></i></a>
+    <h2>
+        <?php if (isset($member) && !empty($member)): ?>
+            <?= htmlspecialchars($member['nama']); ?>
+        <?php else: ?>
+            Guest
+        <?php endif; ?>
+    </h2>
+    <a href="<?= site_url('member/logout') ?>" title="Logout" style="color:#fff;">
+        <i class="fas fa-sign-out-alt"></i>
+    </a>
 </div>

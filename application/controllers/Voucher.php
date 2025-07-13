@@ -1,9 +1,11 @@
 <?php
-defined('BASEPATH') OR exit('No direct script access allowed');
 
-class Voucher extends CI_Controller {
+defined('BASEPATH') or exit('No direct script access allowed');
 
-    public function __construct() {
+class Voucher extends CI_Controller
+{
+    public function __construct()
+    {
         parent::__construct();
         $this->load->model('Voucher_model');
         $this->load->library('form_validation');

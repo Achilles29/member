@@ -1,7 +1,9 @@
 <?php
-class Poin_model extends CI_Model {
 
-    public function get_active_poin($member_id) {
+class Poin_model extends CI_Model
+{
+    public function get_active_poin($member_id)
+    {
         $this->db->select_sum('jumlah_poin');
         $this->db->where('customer_id', $member_id);
         $this->db->where('status', 'aktif');
@@ -10,14 +12,16 @@ class Poin_model extends CI_Model {
 
         return $result['jumlah_poin'] ?? 0;
     }
-    public function get_riwayat_poin($member_id) {
+    public function get_riwayat_poin($member_id)
+    {
         return $this->db->where('customer_id', $member_id)
                         ->order_by('created_at', 'DESC')
                         ->get('pr_customer_poin')
                         ->result_array();
     }
 
-    public function get_total_poin($member_id) {
+    public function get_total_poin($member_id)
+    {
         $this->db->select_sum('jumlah_poin');
         $this->db->where([
             'customer_id' => $member_id,
@@ -28,7 +32,8 @@ class Poin_model extends CI_Model {
         return (int) ($result->jumlah_poin ?? 0);
     }
 
-    public function get_kedaluwarsa_segera($member_id) {
+    public function get_kedaluwarsa_segera($member_id)
+    {
         $now = date('Y-m-d');
         $soon = date('Y-m-d', strtotime('+7 days'));
         return $this->db->where('customer_id', $member_id)
@@ -37,7 +42,8 @@ class Poin_model extends CI_Model {
                         ->where('tanggal_kedaluwarsa <=', $soon)
                         ->get('pr_customer_poin')->result_array();
     }
-    public function get_summary($member_id) {
+    public function get_summary($member_id)
+    {
         $today = date('Y-m-d');
         $next_month = date('Y-m-d', strtotime('+30 days'));
 
@@ -84,10 +90,13 @@ class Poin_model extends CI_Model {
         $this->db->where('cp.created_at >=', $start_date);
         $this->db->where('cp.created_at <=', $end_date);
         $this->db->order_by('cp.created_at', 'desc');
-        if ($limit !== null) $this->db->limit($limit);
+        if ($limit !== null) {
+            $this->db->limit($limit);
+        }
         return $this->db->get()->result_array();
     }
-    public function get_pagination($customer_id, $start_date, $end_date, $limit, $offset) {
+    public function get_pagination($customer_id, $start_date, $end_date, $limit, $offset)
+    {
         $this->db->select('p.*, t.no_transaksi');
         $this->db->from('pr_customer_poin p');
         $this->db->join('pr_transaksi t', 't.id = p.transaksi_id', 'left');
@@ -95,20 +104,21 @@ class Poin_model extends CI_Model {
         $this->db->where('p.created_at >=', $start_date);
         $this->db->where('p.created_at <=', $end_date);
         $this->db->order_by('p.created_at', 'DESC');
-    
+
         if ($limit !== 'semua') {
             $this->db->limit($limit, $offset);
         }
-    
+
         return $this->db->get()->result_array();
     }
-    
-    public function get_pagination_count($customer_id, $start_date, $end_date) {
+
+    public function get_pagination_count($customer_id, $start_date, $end_date)
+    {
         $this->db->from('pr_customer_poin');
         $this->db->where('customer_id', $customer_id);
         $this->db->where('created_at >=', $start_date);
         $this->db->where('created_at <=', $end_date);
         return $this->db->count_all_results();
     }
-    
+
 }

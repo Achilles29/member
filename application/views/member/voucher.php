@@ -11,7 +11,7 @@
                     Gratis produk:
                     <?php
                         $produk = $this->db->get_where('pr_produk', ['id' => $v['produk_id']])->row('nama_produk');
-                        echo $produk ?? 'Produk tidak ditemukan';
+                    echo $produk ?? 'Produk tidak ditemukan';
                     ?>
                 <?php elseif ($v['jenis'] === 'diskon'): ?>
                     <?php if (isset($v['tipe_diskon']) && $v['tipe_diskon'] === 'persentase'): ?>

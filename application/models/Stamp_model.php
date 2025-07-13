@@ -1,8 +1,11 @@
 <?php
-defined('BASEPATH') OR exit('No direct script access allowed');
 
-class Stamp_model extends CI_Model {
-    public function get_active_stamp_by_customer($customer_id) {
+defined('BASEPATH') or exit('No direct script access allowed');
+
+class Stamp_model extends CI_Model
+{
+    public function get_active_stamp_by_customer($customer_id)
+    {
         $this->db->select('pcs.promo_stamp_id, ps.nama_promo, SUM(pcs.jumlah_stamp) as jumlah_stamp, ps.total_stamp_target');
         $this->db->from('pr_customer_stamp pcs');
         $this->db->join('pr_promo_stamp ps', 'pcs.promo_stamp_id = ps.id');
