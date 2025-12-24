@@ -20,23 +20,23 @@ class Order extends CI_Controller
     {
         $customer_id = $this->session->userdata('member_id');
         $data['title'] = 'Order Mandiri';
-        $data['produk'] = $this->Produk_model->get_all();
 
+        // Ambil semua kategori aktif dan urutkan
         $this->load->model('Kategori_model');
-        $data['kategori'] = $this->Kategori_model->get_all(); // ambil kategori aktif
+        $kategori = $this->Kategori_model->get_all(); // status = 1, urutan ASC
+        $data['kategori'] = $kategori;
 
-        // ambil kategori yang dipilih (jika ada)
-        $selected_kategori = $this->input->get('kategori');
-        $data['selected_kategori'] = $selected_kategori;
+        // Ambil produk berdasarkan kategori (dikelompokkan)
+        $this->load->model('Produk_model');
+        $data['produk_per_kategori'] = [];
+        foreach ($kategori as $kat) {
+            $data['produk_per_kategori'][$kat->id] = $this->Produk_model->get_by_kategori($kat->id);
+        }
 
-        // ambil produk berdasarkan kategori
-        $data['produk'] = $this->Produk_model->get_by_kategori($selected_kategori);
-
-
-
-        // ambil info member
+        // Ambil info member
         $data['member'] = $this->db->get_where('pr_customer', ['id' => $customer_id])->row_array();
 
+        // Load view
         $this->load->view('templates/header', $data);
         $this->load->view('order/form', $data);
         $this->load->view('templates/footer');
