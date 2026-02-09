@@ -12,28 +12,27 @@ class Redeem extends CI_Controller
         $this->load->helper(['url', 'form', 'text']);
     }
 
-    public function index()
-    {
-        $member_id = $this->session->userdata('member_id');
-        if (!$member_id) {
-            redirect('login');
-        }
-
-
-
-        $data['member'] = $this->Member_model->get_member_by_id($member_id);
-        $data['poin'] = $this->Member_model->get_active_poin($member_id);
-        $data['stamp'] = $this->Redeem_model->get_active_stamp($member_id);
-        $data['redeem_poin'] = $this->Redeem_model->get_all_active_by_type('poin');
-        $data['redeem_stamp'] = $this->Redeem_model->get_all_active_by_type('stamp');
-
-        $data['title'] = "Redeem";
-
-        $this->load->view('templates/header', $data);
-        $this->load->view('member/redeem', $data);
-        $this->load->view('templates/footer', $data);
-
+public function index()
+{
+    $member_id = $this->session->userdata('member_id');
+    if (!$member_id) {
+        redirect('login');
     }
+
+    $data['member'] = $this->Member_model->get_member_by_id($member_id);
+    $data['poin'] = (int) $this->Member_model->get_active_poin($member_id);
+    $data['stamp'] = $this->Redeem_model->get_active_stamp($member_id);
+
+    $data['redeem_poin']  = $this->Redeem_model->get_all_active_by_type('poin');
+    $data['redeem_stamp'] = $this->Redeem_model->get_all_active_by_type('stamp');
+
+    $data['title'] = "Redeem";
+    $data['active_menu'] = 'redeem';
+
+    $this->load->view('templates/member/header', $data);
+    $this->load->view('member/redeem', $data);
+    $this->load->view('templates/member/footer', $data);
+}
 
 
     private function generate_kode_voucher($nama_redeem)

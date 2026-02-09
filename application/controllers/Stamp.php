@@ -21,10 +21,11 @@ class Stamp extends CI_Controller
         $data['member'] = $this->Member_model->get_member_by_id($member_id);
         $data['stamp_list'] = $this->Stamp_model->get_active_stamp_by_customer($member_id);
         $data['title'] = "Stamp Saya";
+        $data['active_menu'] = 'stamp';
 
-        $this->load->view('templates/header', $data);
+        $this->load->view('templates/member/header', $data);
         $this->load->view('member/stamp', $data);
-        $this->load->view('templates/footer', $data);
+        $this->load->view('templates/member/footer', $data);
 
 
     }

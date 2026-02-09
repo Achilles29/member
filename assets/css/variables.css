@@ -1,0 +1,23 @@
+:root {
+  /* Brand */
+  --primary: #7B1E1E;
+  --primary-dark: #5E1414;
+  --secondary: #4E342E;
+  --accent: #D7A86E;
+
+  /* Base */
+  --bg: #FFF8F2;
+  --card: #FFFFFF;
+
+  /* Text */
+  --text-main: #3E2723;
+  --text-muted: #8D6E63;
+
+  /* Radius */
+  --radius-lg: 18px;
+  --radius-md: 12px;
+  --radius-sm: 8px;
+
+  /* Shadow */
+  --shadow-soft: 0 6px 18px rgba(0,0,0,.08);
+}

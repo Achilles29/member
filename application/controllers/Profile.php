@@ -19,17 +19,20 @@ class Profile extends CI_Controller
         }
     }
 
-    public function index()
-    {
-        $this->check_login();
-        $member_id = $this->session->userdata('member_id');
-        $data['member'] = $this->Member_model->get_member_by_id($member_id);
-        $this->load->view('templates/header', $data);
-        $this->load->view('member/profile', $data);
-        $this->load->view('templates/footer', $data);
+public function index()
+{
+    $this->check_login();
+    $member_id = $this->session->userdata('member_id');
 
+    $data['member'] = $this->Member_model->get_member_by_id($member_id);
+    $data['title'] = 'Akun';
+    $data['active_menu'] = 'akun';
 
-    }
+    $this->load->view('templates/member/header', $data);
+    $this->load->view('member/profile', $data);
+    $this->load->view('templates/member/footer', $data);
+}
+
     public function update()
     {
         $this->check_login();

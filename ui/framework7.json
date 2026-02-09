@@ -1,0 +1,18 @@
+{
+  "cwd": "/www/wwwroot/member",
+  "type": [
+    "web"
+  ],
+  "name": "Namua Member",
+  "framework": "core",
+  "template": "tabs",
+  "bundler": "vite",
+  "cssPreProcessor": false,
+  "theming": {
+    "customColor": true,
+    "color": "#8b1c1c",
+    "darkMode": false,
+    "iconFonts": true
+  },
+  "customBuild": false
+}

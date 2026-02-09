@@ -1,150 +1,221 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <title>Daftar Member - Namua</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        * {
-            box-sizing: border-box;
-        }
+  <meta charset="UTF-8">
+  <title>Daftar Member - Namua</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: 'Arial', sans-serif;
-            background: 
-                linear-gradient(to bottom, rgba(139, 28, 28, 0.7), rgba(248, 241, 229, 0.95)),
-                url('<?= base_url('uploads/kopi.jpg') ?>') no-repeat center center / cover;
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
+  <style>
+    :root{
+      --primary:#8b1c1c;
+      --primary2:#b12a2a;
+      --text:#111827;
+      --muted:#6b7280;
+      --card:#ffffff;
+      --shadow:0 18px 40px rgba(0,0,0,.18);
+      --radius:18px;
+    }
 
-        .form-box {
-            background: rgba(255, 255, 255, 0.95);
-            padding: 30px 25px;
-            border-radius: 12px;
-            box-shadow: 0 0 15px rgba(0,0,0,0.1);
-            width: 90%;
-            max-width: 380px;
-            text-align: center;
-        }
+    *{box-sizing:border-box}
 
-        .form-box img.logo {
-            width: 100px;
-            margin-bottom: 10px;
-        }
+    html,body{height:100%}
 
-        .form-box h2 {
-            margin-bottom: 20px;
-            font-size: 20px;
-            color: #8b1c1c;
-        }
+    body{
+      margin:0;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
+      background:
+        linear-gradient(
+          135deg,
+          rgba(139,28,28,.75),
+          rgba(248,241,229,.95)
+        ),
+        url('<?= base_url('uploads/kopi.jpg') ?>') no-repeat center / cover;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:18px;
+      color:var(--text);
+    }
 
-        input, select {
-            width: 100%;
-            padding: 12px;
-            margin-bottom: 15px;
-            border: 1px solid #ccc;
-            border-radius: 8px;
-            font-size: 14px;
-        }
+    .nm-auth{
+      width:100%;
+      max-width:420px;
+    }
 
-        button {
-            width: 100%;
-            padding: 12px;
-            background-color: #8b1c1c;
-            color: #fff;
-            border: none;
-            border-radius: 8px;
-            font-size: 15px;
-            font-weight: bold;
-            cursor: pointer;
-        }
+    .nm-card{
+      background:rgba(255,255,255,.96);
+      border-radius:24px;
+      box-shadow:var(--shadow);
+      padding:26px 22px;
+      text-align:center;
+      backdrop-filter: blur(2px);
+    }
 
-        .back-link {
-            text-align: center;
-            margin-top: 15px;
-            font-size: 14px;
-        }
+    .nm-logo{
+      width:96px;
+      height:96px;
+      border-radius:22px;
+      margin:0 auto 14px;
+      background:#fff;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      box-shadow:0 10px 22px rgba(0,0,0,.12);
+      overflow:hidden;
+    }
+    .nm-logo img{
+      width:100%;
+      height:100%;
+      object-fit:contain;
+    }
 
-        .error-message {
-            color: red;
-            font-size: 13px;
-            margin-bottom: 10px;
-        }
+    .nm-title{
+      font-size:20px;
+      font-weight:1000;
+      color:var(--primary);
+      margin:0;
+    }
+    .nm-sub{
+      margin-top:6px;
+      font-size:13px;
+      color:var(--muted);
+      font-weight:800;
+    }
 
-        @media (max-width: 480px) {
-            .form-box {
-                padding: 25px 20px;
-            }
+    .nm-field{
+      margin-top:14px;
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+      text-align:left;
+    }
+    .nm-field label{
+      font-size:12px;
+      font-weight:900;
+      color:var(--muted);
+    }
+    .nm-field input,
+    .nm-field select{
+      height:48px;
+      border-radius:16px;
+      border:1px solid #e5e7eb;
+      padding:0 14px;
+      font-size:14px;
+      outline:none;
+      background:#fff;
+    }
+    .nm-field input:focus,
+    .nm-field select:focus{
+      border-color:rgba(139,28,28,.35);
+      box-shadow:0 0 0 4px rgba(139,28,28,.12);
+    }
 
-            .form-box h2 {
-                font-size: 18px;
-            }
-        }
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
-            color: #555;
-        }
-        .form-group input,
-        .form-group select {
-            width: 100%;
-            padding: 10px;
-            margin-bottom: 15px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-        }
+    .nm-btn{
+      margin-top:18px;
+      width:100%;
+      height:48px;
+      border:none;
+      border-radius:16px;
+      background:linear-gradient(135deg,var(--primary),var(--primary2));
+      color:#fff;
+      font-weight:1000;
+      font-size:15px;
+      cursor:pointer;
+      box-shadow:0 14px 24px rgba(139,28,28,.28);
+    }
+    .nm-btn:active{transform:scale(.99)}
 
-    </style>
+    .nm-footer{
+      margin-top:16px;
+      font-size:13px;
+      font-weight:800;
+      color:var(--muted);
+    }
+    .nm-footer a{
+      color:var(--primary);
+      font-weight:1000;
+      text-decoration:none;
+    }
+
+    @media (max-width:420px){
+      .nm-card{padding:24px 18px}
+      .nm-title{font-size:18px}
+    }
+  </style>
 </head>
+
 <body>
 
-<div class="form-box">
-    <h2 style="text-align:center; color:#8b1c1c;">Daftar Member</h2>
-    <form method="post" action="<?= site_url('register/process') ?>">
+  <div class="nm-auth">
+    <div class="nm-card">
 
-        <div class="form-group">
-            <label for="nama">Nama Lengkap</label>
-            <input type="text" id="nama" name="nama" required>
+      <div class="nm-logo">
+        <img src="<?= base_url('uploads/logo.png') ?>" alt="Namua Logo">
+      </div>
+
+      <h1 class="nm-title">Daftar Member</h1>
+      <div class="nm-sub">Isi data untuk mulai bergabung</div>
+
+      <form method="post" action="<?= site_url('register/process') ?>">
+
+        <div class="nm-field">
+          <label for="nama">Nama Lengkap</label>
+          <input type="text" id="nama" name="nama" required>
         </div>
 
-        <div class="form-group">
-            <label for="telepon">Nomor HP</label>
-            <input type="text" id="telepon" name="telepon" required>
+        <div class="nm-field">
+          <label for="telepon">Nomor HP</label>
+          <input
+            type="tel"
+            id="telepon"
+            name="telepon"
+            inputmode="numeric"
+            placeholder="08xxxxxxxxxx"
+            required
+          >
         </div>
 
-        <div class="form-group">
-            <label for="alamat">Alamat</label>
-            <input type="text" id="alamat" name="alamat">
+        <div class="nm-field">
+          <label for="alamat">Alamat</label>
+          <input type="text" id="alamat" name="alamat">
         </div>
 
-        <div class="form-group">
-            <label for="jenis_kelamin">Jenis Kelamin</label>
-            <select id="jenis_kelamin" name="jenis_kelamin">
-                <option value="">Pilih Jenis Kelamin</option>
-                <option value="Laki-laki">Laki-laki</option>
-                <option value="Perempuan">Perempuan</option>
-            </select>
+        <div class="nm-field">
+          <label for="jenis_kelamin">Jenis Kelamin</label>
+          <select id="jenis_kelamin" name="jenis_kelamin">
+            <option value="">Pilih Jenis Kelamin</option>
+            <option value="Laki-laki">Laki-laki</option>
+            <option value="Perempuan">Perempuan</option>
+          </select>
         </div>
 
-        <div class="form-group">
-            <label for="tanggal_lahir">Tanggal Lahir</label>
-            <input type="date" id="tanggal_lahir" name="tanggal_lahir">
+        <div class="nm-field">
+          <label for="tanggal_lahir">Tanggal Lahir</label>
+          <input type="date" id="tanggal_lahir" name="tanggal_lahir">
         </div>
 
-        <button type="submit">Daftar</button>
-    </form>
+        <button type="submit" class="nm-btn">
+          Daftar
+        </button>
+      </form>
 
-    <div class="back-link">
-            <a href="<?= site_url('login') ?>" style="color:#8b1c1c; font-weight: bold;">← Kembali ke Login</a>
-        </div>
+      <div class="nm-footer">
+        Sudah punya akun?
+        <a href="<?= site_url('login') ?>">Kembali ke Login</a>
+      </div>
 
-</div>
+    </div>
+  </div>
+
+  <script>
+    // Nomor HP hanya angka
+    const tel = document.getElementById('telepon');
+    if (tel) {
+      tel.addEventListener('input', () => {
+        tel.value = tel.value.replace(/[^\d]/g,'');
+      });
+    }
+  </script>
 
 </body>
 </html>

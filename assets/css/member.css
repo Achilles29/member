@@ -1,97 +1,226 @@
-body {
-	margin: 0;
-	font-family: "Arial", sans-serif;
-	background: #fff;
-	color: #333;
+:root{
+  --primary:#8b1c1c;
+  --secondary:#4b2c20;
+  --bg:#fffaf6;
+  --card:#ffffff;
 }
-.container {
-	padding: 20px;
-	padding-bottom: 90px; /* space for nav */
+
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  font-family: Inter, system-ui, sans-serif;
+  background:var(--bg);
+  color:#333;
 }
-.header {
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
+
+/* HEADER */
+.nm-header{
+  background:linear-gradient(135deg,#8b1c1c,#5c1414);
+  color:#fff;
+  padding:16px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  border-radius:0 0 22px 22px;
 }
-.level {
-	color: green;
-	font-weight: bold;
+.nm-name{font-weight:600;font-size:16px}
+.nm-level{font-size:12px;opacity:.85}
+.nm-logout{color:#fff}
+
+/* CONTAINER */
+.nm-container{
+  padding:16px;
+  padding-bottom:90px;
 }
-.info-bar {
-	display: flex;
-	justify-content: space-around;
-	margin: 15px 0;
-	font-size: 14px;
+
+/* CARD */
+.nm-card{
+  background:#fff;
+  border-radius:18px;
+  padding:16px;
+  margin-bottom:16px;
+  box-shadow:0 6px 20px rgba(0,0,0,.08);
 }
-.point-box {
-	text-align: center;
-	background: #f3f3f3;
-	padding: 20px;
-	border-radius: 10px;
+
+/* POINT */
+.nm-point{text-align:center}
+.nm-point h1{
+  margin:0;
+  font-size:42px;
+  color:var(--primary);
 }
-.progress-bar {
-	background: #ddd;
-	height: 8px;
-	border-radius: 5px;
-	margin: 10px auto;
-	width: 80%;
+
+/* GRID */
+.nm-grid{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:12px;
 }
-.progress-bar .filled {
-	background: green;
-	height: 8px;
-	border-radius: 5px;
+.nm-grid i{
+  font-size:20px;
+  color:var(--primary);
+  margin-bottom:6px;
 }
-.btn-row {
-	display: flex;
-	justify-content: space-around;
-	margin-top: 10px;
+
+/* PROMO */
+.nm-promo img{
+  width:100%;
+  height:160px;
+  object-fit:cover;
+  border-radius:16px;
 }
-.details-btn,
-.redeem-btn {
-	padding: 8px 16px;
-	border: none;
-	border-radius: 20px;
-	cursor: pointer;
+
+/* NEWS */
+.nm-news{
+  display:flex;
+  gap:12px;
 }
-.details-btn {
-	background: white;
-	border: 1px solid green;
-	color: green;
+.nm-news img{
+  width:70px;
+  height:70px;
+  object-fit:cover;
+  border-radius:12px;
 }
-.redeem-btn {
-	background: green;
-	color: white;
+
+/* NAV */
+.nm-nav{
+  position:fixed;
+  bottom:0;left:0;right:0;
+  background:#fff;
+  border-top:1px solid #eee;
+  display:flex;
+  justify-content:space-around;
+  padding:10px 0;
 }
-.promo-section,
-.news-section {
-	margin-top: 30px;
+.nm-nav a{
+  text-decoration:none;
+  font-size:11px;
+  color:#777;
+  text-align:center;
 }
-.promo-box img {
-	width: 100%;
-	border-radius: 10px;
+.nm-nav a.active{color:var(--primary)}
+.nm-nav i{font-size:18px}
+
+/* =========================================================
+   VOUCHER PAGE
+========================================================= */
+.nm-voucher-tabs{
+  margin-top:-18px;
+  display:flex;
+  gap:10px;
+  overflow-x:auto;
+  padding:10px 2px 6px;
+  position:sticky;          /* biar tetap enak pas scroll */
+  top:0;
+  z-index:5;
+  background:var(--bg);
 }
-.bottom-nav {
-	position: fixed;
-	bottom: 0;
-	left: 0;
-	right: 0;
-	height: 70px;
-	background: white;
-	box-shadow: 0 -1px 5px rgba(0, 0, 0, 0.1);
-	display: flex;
-	justify-content: space-around;
-	align-items: center;
+.nm-voucher-tabs::-webkit-scrollbar{display:none;}
+
+.nm-vtab{
+  -webkit-tap-highlight-color: transparent;
+  flex:0 0 auto;
+  display:inline-flex;
+  align-items:center;
+  gap:10px;
+  padding:10px 14px;
+  border-radius:999px;
+  border:1px solid #e5e7eb;
+  background:#fff;
+  text-decoration:none;
+  color:#111827;
+  font-weight:1000;
+  font-size:13px;
+  box-shadow:0 10px 18px rgba(0,0,0,.06);
+  transition:transform .08s ease, box-shadow .12s ease, background .12s ease, border-color .12s ease;
 }
-.bottom-nav a {
-	text-align: center;
-	color: #999;
-	font-size: 12px;
-	text-decoration: none;
+
+.nm-vtab.is-active{
+  border-color:rgba(139,28,28,.25);
+  background:rgba(139,28,28,.10);
+  color:var(--primary);
 }
-.bottom-nav a.active {
-	color: green;
+
+.nm-vtab:active{
+  transform:scale(.98);
+  box-shadow:0 6px 12px rgba(0,0,0,.06);
 }
-.bottom-nav i {
-	font-size: 18px;
-	display: block;
+
+.nm-vtab:active{
+  transform:scale(.98);
+  box-shadow:0 6px 12px rgba(0,0,0,.06);
 }
+.nm-vtab:focus-visible{
+  outline:3px solid rgba(139,28,28,.22);
+  outline-offset:2px;
+}
+
+
+.nm-vtab.is-active{
+  border-color:rgba(139,28,28,.28);
+  background:linear-gradient(135deg, rgba(139,28,28,.14), rgba(177,42,42,.12));
+  color:var(--primary);
+  box-shadow:0 14px 24px rgba(139,28,28,.12);
+}
+
+/* badge count */
+.nm-vtab-badge{
+  height:22px;
+  min-width:22px;
+  padding:0 8px;
+  border-radius:999px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  background:#f3f4f6;
+  font-size:12px;
+  font-weight:1100;
+  color:#374151;
+}
+
+.nm-vtab.is-active .nm-vtab-badge{
+  background:rgba(139,28,28,.18);
+  color:var(--primary);
+}
+
+/* biar tab tidak "biru link" kalau ada style global a */
+.nm-vtab, .nm-vtab:visited{ color:inherit; }
+
+.nm-voucher-card{ padding:14px; }
+.nm-voucher-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+}
+.nm-voucher-code{
+  font-weight:1100;
+  letter-spacing:.6px;
+  font-size:14px;
+  color:var(--text);
+}
+.nm-voucher-desc{
+  margin-top:10px;
+  font-size:13px;
+  color:#374151;
+  font-weight:800;
+  line-height:1.35;
+}
+.nm-voucher-meta{
+  margin-top:12px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+}
+.nm-voucher-date{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  font-size:12px;
+  color:var(--muted);
+  font-weight:900;
+}
+.nm-voucher-date i{font-size:16px;color:var(--primary);}
