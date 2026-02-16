@@ -14,5 +14,6 @@ class Pending_order_detail_model extends CI_Model {
             'updated_at' => date('Y-m-d H:i:s')
         ];
         $this->db->insert('pr_pending_order_detail', $data);
+        return (int) $this->db->insert_id();
     }
 }

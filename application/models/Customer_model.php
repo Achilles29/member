@@ -6,7 +6,9 @@ class Customer_model extends CI_Model
 {
     public function insert_customer($data)
     {
-        return $this->db->insert('pr_customer', $data);
+        $ok = $this->db->insert('pr_customer', $data);
+        if (!$ok) return false;
+        return (int)$this->db->insert_id();
     }
 
     public function get_customer_by_telepon($telepon)

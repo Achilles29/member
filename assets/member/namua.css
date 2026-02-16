@@ -12,6 +12,9 @@
   --shadow2:0 6px 16px rgba(0,0,0,.08);
 
   --radius:18px;
+
+  /* Dipakai buat jarak UI fixed bawah (tabbar). */
+  --nm-bottom-ui:92px;
 }
 
 /* =========================================================
@@ -262,6 +265,471 @@ body{
   box-shadow:var(--shadow2);
   margin-top:12px;
 }
+
+/* =========================================================
+   ORDER (Member)
+========================================================= */
+.nm-order .nm-card{ margin-top:12px; box-shadow:var(--shadow2); }
+.nm-alert{
+  padding:12px 12px;
+  border-radius:14px;
+  font-size:13px;
+  font-weight:800;
+}
+.nm-alert--danger{ background:#fee2e2; color:#7f1d1d; }
+
+.nm-order__search{ padding:12px 12px; }
+.nm-order__searchRow{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  padding:10px 12px;
+  border-radius:16px;
+  background:#f3f4f6;
+}
+.nm-order__searchRow i{ color:#6b7280; font-size:18px; }
+.nm-order__searchRow input{
+  border:none;
+  outline:none;
+  background:transparent;
+  width:100%;
+  font-size:14px;
+  color:var(--text);
+}
+
+.nm-order__chips{
+  margin-top:12px;
+  display:flex;
+  gap:10px;
+  overflow-x:auto;
+  padding:0 2px 2px;
+  scroll-snap-type:x mandatory;
+}
+.nm-order__chips::-webkit-scrollbar{display:none;}
+.nm-chip-btn{
+  flex:0 0 auto;
+  scroll-snap-align:start;
+  border:1px solid rgba(139,28,28,.18);
+  background:#fff;
+  color:var(--primary);
+  padding:9px 12px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:900;
+}
+.nm-chip-btn.is-active{
+  background:linear-gradient(135deg,var(--primary),var(--primary2));
+  color:#fff;
+  border-color:transparent;
+}
+
+.nm-order__section{ margin-top:8px; scroll-margin-top:120px; }
+.nm-order__grid{
+  margin-top:10px;
+  display:grid;
+  grid-template-columns:repeat(2, 1fr);
+  gap:10px;
+}
+.nm-order__item{
+  border:none;
+  text-align:left;
+  background:#fff;
+  border-radius:18px;
+  box-shadow:var(--shadow2);
+  padding:10px;
+  color:var(--text);
+}
+.nm-order__item.is-disabled{
+  opacity:.55;
+  filter:grayscale(.15);
+}
+.nm-order__imgWrap{
+  width:100%;
+  height:110px;
+  border-radius:16px;
+  overflow:hidden;
+  background:#f3f4f6;
+  position:relative;
+}
+.nm-order__imgWrap img{ width:100%; height:100%; object-fit:cover; display:block; }
+.nm-order__badge{
+  position:absolute;
+  top:8px;
+  left:8px;
+  padding:6px 8px;
+  border-radius:999px;
+  font-size:11px;
+  font-weight:1000;
+  letter-spacing:.2px;
+  box-shadow:0 10px 22px rgba(0,0,0,.12);
+}
+.nm-order__badge--habis{
+  background:rgba(17,24,39,.92);
+  color:#fff;
+}
+.nm-order__badge--limited{
+  background:linear-gradient(135deg,#f97316,#ef4444);
+  color:#fff;
+}
+.nm-order__meta{ margin-top:10px; min-height:46px; }
+.nm-order__name{ font-size:13px; font-weight:1000; line-height:1.2; }
+.nm-order__price{ margin-top:4px; font-size:12px; color:var(--primary); font-weight:1000; }
+.nm-order__stockinfo{
+  margin-top:4px;
+  font-size:11px;
+  font-weight:1000;
+  letter-spacing:.1px;
+  opacity:.92;
+}
+.nm-order__stockinfo--habis{ color:#111827; }
+.nm-order__stockinfo--limited{ color:#b45309; }
+.nm-order__add{
+  margin-top:10px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:9px 10px;
+  border-radius:14px;
+  background:rgba(139,28,28,.08);
+  color:var(--primary);
+  font-weight:1000;
+  font-size:12px;
+}
+
+.nm-cartbar{
+  position:fixed;
+  left:50%;
+  transform:translateX(-50%);
+  bottom:74px; /* di atas tabbar */
+  width:calc(100% - 28px);
+  max-width:392px;
+  z-index:1000;
+}
+.nm-cartbar__btn{
+  width:100%;
+  border:none;
+  background:linear-gradient(135deg,var(--primary),var(--primary2));
+  color:#fff;
+  border-radius:18px;
+  padding:12px 12px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  box-shadow:var(--shadow);
+}
+.nm-cartbar__left{ display:flex; gap:10px; align-items:center; }
+.nm-cartbar__badge{
+  min-width:28px;
+  height:28px;
+  border-radius:10px;
+  background:rgba(255,255,255,.22);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight:1000;
+}
+.nm-cartbar__title{ font-weight:1000; font-size:12px; }
+.nm-cartbar__sub{ opacity:.9; font-size:11px; margin-top:2px; }
+.nm-cartbar__right{ display:flex; gap:10px; align-items:center; }
+.nm-cartbar__total{ font-weight:1000; font-size:12px; }
+
+.nm-no-scroll{ overflow:hidden; }
+.nm-sheet{
+  position:fixed;
+  inset:0;
+  /* Di bawah tabbar: sheet harus muncul di atas konten, tapi tidak menutup navbar/tabbar bawah. */
+  z-index:99998;
+}
+.nm-popup{
+  position:fixed;
+  inset:0;
+  /* Popup tetap boleh menutup tabbar (mis. dialog/konfirmasi). */
+  z-index:100000;
+}
+.nm-sheet__backdrop, .nm-popup__backdrop{ position:absolute; inset:0; background:rgba(17,24,39,.45); }
+.nm-sheet__panel{
+  position:absolute;
+  left:0;
+  right:0;
+  margin:0 auto;
+  /* Naikkan panel di atas tabbar fixed bawah, tapi biarkan tabbar tetap terlihat. */
+  bottom:calc(var(--nm-bottom-ui) + env(safe-area-inset-bottom, 0px));
+  /* Biar tidak "melebar" di mobile (content-box + padding bisa bikin overflow). */
+  box-sizing:border-box;
+  width:calc(100% - 28px);
+  max-width:420px;
+  background:#fff;
+  border-radius:22px 22px 0 0;
+  padding:10px 14px 14px;
+  box-shadow:var(--shadow);
+  max-height:70vh;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+}
+.nm-sheet__handle{ width:54px; height:5px; border-radius:99px; background:#e5e7eb; margin:6px auto 10px; }
+.nm-sheet__head{ display:flex; align-items:center; justify-content:space-between; }
+.nm-sheet__title{ font-size:15px; font-weight:1000; }
+.nm-iconbtn{
+  border:none;
+  background:#f3f4f6;
+  width:40px; height:40px;
+  border-radius:14px;
+  display:flex; align-items:center; justify-content:center;
+}
+.nm-sheet__content{
+  margin-top:12px;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  flex:1;
+  min-height:0;
+}
+#nmCartList{
+  flex:1;
+  overflow:auto;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;
+  min-height:0;
+}
+.nm-empty{ padding:18px 4px; text-align:center; color:var(--muted); font-weight:800; }
+.nm-cartitem{
+  display:flex;
+  gap:12px;
+  align-items:flex-start;
+  justify-content:space-between;
+  padding:12px 0;
+  border-bottom:1px dashed #e5e7eb;
+}
+.nm-cartitem__name{ font-weight:1000; font-size:13px; }
+.nm-cartitem__extras{ margin-top:4px; font-size:11px; color:var(--muted); font-weight:900; }
+.nm-cartitem__price{ margin-top:6px; font-size:12px; color:var(--primary); font-weight:1000; }
+.nm-cartitem__ctrl{
+  display:flex;
+  gap:8px;
+  row-gap:8px;
+  align-items:center;
+  justify-content:flex-end;
+  flex-wrap:wrap; /* kalau sempit, biar "Hapus" bisa turun tanpa memaksa stepper jadi bertumpuk */
+}
+.nm-cartstep{ display:flex; gap:8px; align-items:center; flex-wrap:nowrap; }
+.nm-cartitem__del{ white-space:nowrap; }
+
+/* Cart sheet: lebih pendek + scroll list konsisten di mobile */
+#nmCartSheet .nm-sheet__panel{
+  /* Pakai height supaya flex child (#nmCartList) dapat ruang scroll yang jelas di semua browser. */
+  height:52dvh;
+  max-height:52dvh;
+  /* Padding bawah normal; posisi panel sudah dinaikkan via bottom: var(--nm-bottom-ui). */
+  padding-bottom:calc(14px + env(safe-area-inset-bottom, 0px));
+}
+@supports not (height: 1dvh) {
+  #nmCartSheet .nm-sheet__panel{ height:52vh; max-height:52vh; }
+}
+#nmCartSheet .nm-sheet__content{ margin-top:10px; }
+#nmCartSheet .nm-sheet__summary{ margin-top:10px; }
+#nmCartSheet .nm-sheet__hint{ margin-top:8px; font-size:10.5px; line-height:1.25; }
+
+/* Padatkan tombol di keranjang biar tidak ketinggian */
+#nmCartSheet .nm-mini{ padding:7px 10px; }
+#nmCartSheet .nm-cartitem__del{ padding:7px 10px; }
+.nm-cartitem__qty{ min-width:22px; text-align:center; font-weight:1000; }
+.nm-mini{
+  border:none;
+  background:#f3f4f6;
+  color:#111827;
+  border-radius:12px;
+  padding:8px 10px;
+  font-size:12px;
+  font-weight:1000;
+}
+.nm-mini--danger{ background:#fee2e2; color:#7f1d1d; }
+
+.nm-sheet__summary{
+  margin-top:14px;
+}
+.nm-sheet__sumRow{ display:flex; align-items:center; justify-content:space-between; font-weight:1000; }
+.nm-sheet__actions{ margin-top:12px; display:flex; gap:10px; }
+.nm-sheet__hint{ margin-top:10px; color:var(--muted); font-size:11px; font-weight:800; }
+
+.nm-popup__panel{
+  position:absolute;
+  left:50%;
+  top:50%;
+  transform:translate(-50%, -50%);
+  width:calc(100% - 28px);
+  max-width:392px;
+  background:#fff;
+  border-radius:22px;
+  box-shadow:var(--shadow);
+  overflow:hidden;
+  max-height:82vh;
+  display:flex;
+  flex-direction:column;
+}
+.nm-popup__head{
+  padding:14px 14px;
+  background:linear-gradient(135deg,var(--primary),var(--primary2));
+  color:#fff;
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+}
+.nm-popup__title{ font-weight:1000; font-size:15px; }
+.nm-popup__price{ margin-top:4px; opacity:.95; font-weight:900; font-size:12px; }
+.nm-popup__body{
+  padding:14px 14px 10px;
+  overflow:auto;
+  -webkit-overflow-scrolling:touch;
+}
+.nm-popup__row{ display:flex; align-items:center; justify-content:space-between; font-weight:1000; }
+.nm-stepper{ display:flex; align-items:center; gap:8px; }
+.nm-stepper__btn{
+  width:38px; height:38px;
+  border:none;
+  border-radius:14px;
+  background:#f3f4f6;
+  font-weight:1000;
+  font-size:16px;
+}
+.nm-stepper input{
+  width:56px;
+  height:38px;
+  border-radius:14px;
+  border:1px solid #e5e7eb;
+  text-align:center;
+  font-weight:1000;
+}
+.nm-popup__extras{ margin-top:14px; }
+.nm-popup__extrasHead{ font-weight:1000; margin-bottom:8px; }
+.nm-popup__extrasToggle{ margin-top:14px; }
+.nm-popup__extrasList{
+  max-height:260px;
+  overflow:auto;
+  -webkit-overflow-scrolling:touch;
+  padding-right:2px;
+}
+.nm-check{
+  display:flex;
+  gap:10px;
+  align-items:flex-start;
+  padding:10px 10px;
+  border-radius:16px;
+  background:#f9fafb;
+  margin-bottom:10px;
+}
+.nm-check input{ margin-top:2px; }
+.nm-check small{ display:block; margin-top:2px; color:var(--muted); font-weight:900; }
+.nm-popup__foot{ padding:12px 14px 14px; border-top:1px solid #f3f4f6; }
+
+.nm-btn{
+  border:none;
+  border-radius:16px;
+  padding:12px 12px;
+  font-weight:1000;
+  font-size:13px;
+  text-decoration:none;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+}
+.nm-btn--block{ width:100%; }
+.nm-btn--primary{ background:linear-gradient(135deg,var(--primary),var(--primary2)); color:#fff; }
+.nm-btn--ghost{ background:#f3f4f6; color:#111827; }
+
+.nm-order__category{
+  padding:0;
+  position:sticky;
+  top:10px;
+  z-index:60;
+}
+.nm-catbtn{
+  width:100%;
+  border:none;
+  background:transparent;
+  padding:12px 14px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  text-align:left;
+  font-weight:1000;
+}
+.nm-catbtn__label{ font-size:11px; color:var(--muted); font-weight:900; }
+.nm-catbtn__value{ margin-top:2px; font-size:13px; color:#111827; font-weight:1000; }
+
+.nm-sheet--cat .nm-sheet__panel{ max-height:62vh; }
+.nm-sheet--cat .nm-sheet__panel{
+  /* Category sheet butuh scroll sendiri (tidak punya #nmCartList). */
+  display:block;
+  overflow:auto;
+}
+.nm-sheet--cat .nm-sheet__content{
+  display:block;
+  overflow:auto;
+}
+.nm-catlist{ display:flex; flex-direction:column; gap:10px; }
+.nm-catitem{
+  border:none;
+  background:#f9fafb;
+  color:#111827;
+  border-radius:16px;
+  padding:12px 12px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  font-weight:1000;
+  font-size:13px;
+}
+
+.nm-order__reviewList{ padding:6px 0; }
+.nm-reviewitem{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  padding:12px 0;
+  border-bottom:1px dashed #e5e7eb;
+}
+.nm-reviewitem__name{ font-weight:1000; font-size:13px; }
+.nm-reviewitem__sub{ margin-top:6px; color:var(--muted); font-size:11px; font-weight:900; display:flex; gap:6px; flex-wrap:wrap; }
+.nm-reviewitem__dot{ opacity:.7; }
+.nm-reviewitem__price{ font-weight:1000; font-size:12px; color:var(--primary); text-align:right; }
+.nm-reviewitem__extraPrice{ margin-top:4px; font-size:11px; color:var(--muted); font-weight:900; text-align:right; }
+
+.nm-order__totalRow{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  font-weight:1000;
+}
+.nm-order__reviewActions{ margin-top:12px; display:flex; gap:10px; }
+.nm-order__hint{ margin-top:10px; color:var(--muted); font-size:12px; font-weight:800; }
+
+.nm-form__label{ font-weight:1000; font-size:12px; margin-bottom:10px; }
+.nm-form textarea{
+  width:100%;
+  border:1px solid #e5e7eb;
+  border-radius:16px;
+  padding:12px 12px;
+  font-size:13px;
+  font-family:inherit;
+}
+.nm-radio{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  padding:12px 12px;
+  border-radius:16px;
+  background:#f9fafb;
+  margin-bottom:10px;
+  font-weight:1000;
+}
+.nm-radio input{ width:18px; height:18px; }
+
+.nm-success{ padding:8px 4px; }
+.nm-success__title{ font-size:16px; font-weight:1000; color:var(--primary); }
+.nm-success__meta{ margin-top:8px; color:#374151; font-weight:900; font-size:12px; }
+.nm-success__desc{ margin-top:10px; color:var(--muted); font-weight:900; font-size:12px; line-height:1.35; }
 .nm-news{display:flex;gap:12px;align-items:center;}
 .nm-news-thumb{
   width:76px;height:76px;
@@ -1063,4 +1531,3 @@ body{
   color:var(--muted);
   font-weight:900;
 }
-

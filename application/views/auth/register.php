@@ -157,6 +157,7 @@
       <div class="nm-sub">Isi data untuk mulai bergabung</div>
 
       <form method="post" action="<?= site_url('register/process') ?>">
+        <input type="hidden" name="redirect_to" value="<?= isset($redirect_to) ? html_escape($redirect_to) : '' ?>">
 
         <div class="nm-field">
           <label for="nama">Nama Lengkap</label>
@@ -201,7 +202,8 @@
 
       <div class="nm-footer">
         Sudah punya akun?
-        <a href="<?= site_url('login') ?>">Kembali ke Login</a>
+        <?php $rt = isset($redirect_to) ? (string)$redirect_to : ''; ?>
+        <a href="<?= site_url('login' . ($rt !== '' ? '?redirect_to=' . urlencode($rt) : '')) ?>">Kembali ke Login</a>
       </div>
 
     </div>

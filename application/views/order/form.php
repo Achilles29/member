@@ -1,331 +1,721 @@
-<!-- Swiper & CSS -->
-<link rel="stylesheet" href="https://unpkg.com/swiper/swiper-bundle.min.css" />
-<script src="https://unpkg.com/swiper/swiper-bundle.min.js"></script>
+<?php
+// Framework7-based order UI (senada dengan halaman member lain).
+// Cart disimpan ke session (AJAX: order/save_cart) + localStorage (anti hilang kalau tab ditutup).
+?>
 
-<style>
-  .product-card img {
-    height: 120px;
-    object-fit: cover;
-  }
-
-  @media (max-width: 576px) {
-    .produk-container .col-6 {
-      flex: 0 0 50%;
-      max-width: 50%;
-    }
-  }
-
-  .swiper-hint {
-    text-align: center;
-    margin-bottom: 1rem;
-    font-size: 0.9rem;
-    color: #888;
-    animation: fadeHint 3s infinite;
-  }
-
-  @keyframes fadeHint {
-
-    0%,
-    100% {
-      opacity: 0.3;
-    }
-
-    50% {
-      opacity: 1;
-    }
-  }
-
-  .swiper-hint i {
-    margin: 0 4px;
-  }
-</style>
-
-<div class="container mt-4">
-  <h4><?= $title ?></h4>
-
-  <!-- Filter kategori & pencarian -->
-  <div class="row mb-3">
-    <div class="col-6">
-      <select id="kategoriSelector" class="form-control">
-        <?php foreach ($kategori as $index => $kat): ?>
-          <option value="<?= $index ?>"><?= $kat->nama_kategori ?></option>
-        <?php endforeach ?>
-      </select>
+<div class="page-content nm-page nm-order">
+  <div class="nm-topbar nm-topbar--mini">
+    <div>
+      <div class="nm-name">Order</div>
+      <div class="nm-level">
+        <?php if (!empty($nomor_meja)): ?>
+          Meja <?= html_escape($nomor_meja) ?>
+        <?php else: ?>
+          Scan QR meja dulu ya
+        <?php endif; ?>
+      </div>
     </div>
-    <div class="col-6">
-      <input type="text" id="search_produk" class="form-control" placeholder="Cari produk...">
-    </div>
-  </div>
-  <div class="swiper-hint">
-    <i class="fas fa-arrow-left"></i> Geser untuk melihat kategori lain <i class="fas fa-arrow-right"></i>
-  </div>
-
-  <!-- Swiper Slide Produk per Kategori -->
-  <div class="swiper mySwiper">
-    <div class="swiper-wrapper">
-      <?php foreach ($kategori as $index => $kat): ?>
-        <div class="swiper-slide">
-          <h5 class="text-center mb-3"><?= $kat->nama_kategori ?></h5>
-          <div class="row produk-container">
-            <?php foreach ($produk_per_kategori[$kat->id] as $p): ?>
-              <div class="col-6 col-md-4 col-lg-3 mb-3 produk-item" data-nama="<?= strtolower($p->nama_produk) ?>">
-                <div class="card product-card" data-id="<?= $p->id ?>" data-nama="<?= $p->nama_produk ?>" data-harga="<?= $p->harga_jual ?>" data-foto="<?= $p->foto ?>">
-                  <img src="https://dashboard.namuacoffee.com/uploads/produk/<?= $p->foto ?>" class="card-img-top">
-                  <div class="card-body text-center p-2">
-                    <small class="fw-bold"><?= $p->nama_produk ?></small><br>
-                    <small class="text-danger">Rp <?= number_format($p->harga_jual, 0, ',', '.') ?></small>
-                  </div>
-                </div>
-              </div>
-            <?php endforeach ?>
-          </div>
-        </div>
-      <?php endforeach ?>
-    </div>
-  </div>
-
-  <!-- Keranjang (Floating Button + Hidden Form) -->
-  <form method="post" action="<?= base_url('order/review') ?>">
-    <div id="order_list"></div>
-    <a href="#" id="cartToggle" class="btn btn-danger rounded-circle shadow"
-      style="position:fixed; bottom:80px; right:20px; width:60px; height:60px; z-index:999;">
-      <i class="fas fa-shopping-cart fa-lg d-flex justify-content-center align-items-center h-100"></i>
+    <a class="nm-logout" href="<?= site_url('member/logout') ?>" title="Logout">
+      <i class="f7-icons">rectangle_porous_arrow_right</i>
     </a>
-  </form>
-</div>
-
-<div id="notifToast" class="toast position-fixed bg-success text-white" style="top: 20px; right: 20px; z-index: 2000;" role="alert" aria-live="assertive" aria-atomic="true" data-delay="2000">
-  <div class="toast-body">
-    Produk ditambahkan ke keranjang.
   </div>
-</div>
 
-<!-- Modal Produk -->
-<div class="modal fade" id="modalOrder" tabindex="-1">
-  <div class="modal-dialog modal-dialog-centered" role="document">
-    <div class="modal-content">
-      <div class="modal-header py-2">
-        <h6 class="modal-title" id="modalOrderLabel">Tambah ke Order</h6>
-        <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
-      </div>
-      <div class="modal-body">
-        <input type="hidden" id="modal_produk_id">
-        <div class="text-center mb-2">
-          <img id="modal_foto" src="" class="img-fluid rounded" style="max-height:120px;">
-        </div>
-        <h6 id="modal_nama" class="text-center mb-2"></h6>
-        <p class="text-center text-danger font-weight-bold mb-3" id="modal_harga"></p>
-        <div class="form-group">
-          <label>Jumlah</label>
-          <input type="number" min="1" id="modal_jumlah" class="form-control" value="1">
-        </div>
-        <div class="form-group">
-          <label>Extra:</label>
-          <div id="extra_selected" class="text-muted">Tidak ada</div>
-          <button type="button" class="btn btn-sm btn-outline-secondary mt-2" data-toggle="modal" data-target="#modalExtra">
-            Pilih Extra
-          </button>
-        </div>
-        <button type="button" class="btn btn-primary btn-block" id="btnTambahOrder">Tambah ke Order</button>
+  <?php if (!empty($this->session->flashdata('error'))): ?>
+    <div class="nm-card" style="margin-top:-22px;">
+      <div class="nm-alert nm-alert--danger">
+        <?= html_escape((string) $this->session->flashdata('error')) ?>
       </div>
     </div>
-  </div>
-</div>
+  <?php endif; ?>
 
-<!-- Modal Extra -->
-<div class="modal fade" id="modalExtra" tabindex="-1">
-  <div class="modal-dialog modal-dialog-scrollable modal-sm">
-    <div class="modal-content">
-      <div class="modal-header py-2">
-        <h6 class="modal-title">Pilih Extra</h6>
-        <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+  <div class="nm-card nm-order__search" style="margin-top:-22px;">
+    <div class="nm-order__searchRow">
+      <i class="f7-icons" aria-hidden="true">search</i>
+      <input id="nmSearch" type="search" placeholder="Cari menu..." autocomplete="off">
+    </div>
+  </div>
+
+  <div class="nm-card nm-order__category" style="margin-top:10px;">
+    <button type="button" class="nm-catbtn" id="nmOpenCategories" aria-label="Pilih kategori">
+      <div>
+        <div class="nm-catbtn__label">Kategori</div>
+        <div class="nm-catbtn__value" id="nmActiveCategory">Semua</div>
       </div>
-      <div class="modal-body p-3">
-        <?php foreach ($this->db->get_where('pr_produk_extra', ['status' => 'aktif'])->result() as $ex): ?>
-          <div class="form-check">
-            <input class="form-check-input extra-option" type="checkbox"
-              value="<?= $ex->id ?>" data-nama="<?= $ex->nama_extra ?>" data-harga="<?= $ex->harga ?>">
-            <label class="form-check-label">
-              <?= $ex->nama_extra ?> <small class="text-muted">(+Rp <?= number_format($ex->harga, 0, ',', '.') ?>)</small>
-            </label>
+      <i class="f7-icons" aria-hidden="true">chevron_down</i>
+    </button>
+  </div>
+
+  <div id="nmProduk">
+    <?php foreach (($kategori ?? []) as $idx => $kat): ?>
+      <div class="nm-order__section" data-kat-id="<?= (int) $kat->id ?>">
+        <div class="nm-section-head">
+          <div>
+            <div class="nm-section-title"><?= html_escape($kat->nama_kategori) ?></div>
+            <div class="nm-section-sub">Tap menu untuk tambah ke keranjang</div>
           </div>
-        <?php endforeach ?>
+        </div>
+
+        <div class="nm-order__grid">
+          <?php foreach (($produk_per_kategori[$kat->id] ?? []) as $p): ?>
+            <?php
+              // Samakan dengan dashboard/beranda:
+              // - stok <= 0 => HABIS
+              // - stok <= 10 => KRITIS
+              $stok_tersedia = (float) ($p->stok_tersedia ?? 0);
+              $is_habis = ($stok_tersedia <= 0);
+              $is_kritis = (!$is_habis && $stok_tersedia <= 10);
+            ?>
+            <button
+              type="button"
+              class="nm-order__item <?= $is_habis ? 'is-disabled' : '' ?>"
+              data-produk-id="<?= (int) $p->id ?>"
+              data-produk-nama="<?= html_escape($p->nama_produk) ?>"
+              data-produk-harga="<?= (float) $p->harga_jual ?>"
+              data-produk-foto="<?= html_escape((string) ($p->foto ?? '')) ?>"
+              <?= $is_habis ? 'disabled aria-disabled="true"' : '' ?>
+            >
+              <div class="nm-order__imgWrap">
+                <img
+                  loading="lazy"
+                  src="https://dashboard.namuacoffee.com/uploads/produk/<?= html_escape((string) ($p->foto ?? '')) ?>"
+                  alt="<?= html_escape($p->nama_produk) ?>"
+                >
+                <?php if ($is_habis): ?>
+                  <div class="nm-order__badge nm-order__badge--habis">HABIS</div>
+                <?php elseif ($is_kritis): ?>
+                  <div class="nm-order__badge nm-order__badge--limited">KRITIS</div>
+                <?php endif; ?>
+              </div>
+              <div class="nm-order__meta">
+                <div class="nm-order__name"><?= html_escape($p->nama_produk) ?></div>
+                <div class="nm-order__price">Rp <?= number_format((float) $p->harga_jual, 0, ',', '.') ?></div>
+                <?php if ($is_habis): ?>
+                  <div class="nm-order__stockinfo nm-order__stockinfo--habis">HABIS</div>
+                <?php elseif ($is_kritis): ?>
+                  <div class="nm-order__stockinfo nm-order__stockinfo--limited">KRITIS</div>
+                <?php endif; ?>
+              </div>
+              <div class="nm-order__add">
+                <?php if ($is_habis): ?>
+                  <span>Tidak tersedia</span>
+                  <i class="f7-icons" aria-hidden="true">lock</i>
+                <?php else: ?>
+                  <span>Tambah</span>
+                  <i class="f7-icons" aria-hidden="true">plus</i>
+                <?php endif; ?>
+              </div>
+            </button>
+          <?php endforeach; ?>
+        </div>
       </div>
-      <div class="modal-footer py-2">
-        <button type="button" class="btn btn-sm btn-primary" id="btnSetExtra" data-dismiss="modal">Simpan</button>
+    <?php endforeach; ?>
+  </div>
+
+  <!-- Bottom cart bar (di atas tabbar) -->
+  <div class="nm-cartbar" id="nmCartBar" hidden>
+    <button type="button" class="nm-cartbar__btn" id="nmOpenCart">
+      <div class="nm-cartbar__left">
+        <div class="nm-cartbar__badge" id="nmCartCount">0</div>
+        <div>
+          <div class="nm-cartbar__title">Keranjang</div>
+          <div class="nm-cartbar__sub" id="nmCartSub">0 item</div>
+        </div>
+      </div>
+      <div class="nm-cartbar__right">
+        <div class="nm-cartbar__total" id="nmCartTotal">Rp 0</div>
+        <i class="f7-icons" aria-hidden="true">chevron_up</i>
+      </div>
+    </button>
+  </div>
+
+  <!-- Cart sheet -->
+  <div class="nm-sheet" id="nmCartSheet" hidden>
+    <div class="nm-sheet__backdrop" id="nmSheetBackdrop"></div>
+    <div class="nm-sheet__panel" role="dialog" aria-modal="true" aria-label="Keranjang">
+      <div class="nm-sheet__handle"></div>
+      <div class="nm-sheet__head">
+        <div class="nm-sheet__title">Keranjang</div>
+        <button type="button" class="nm-iconbtn" id="nmCloseCart" aria-label="Tutup">
+          <i class="f7-icons">xmark</i>
+        </button>
+      </div>
+
+      <div class="nm-sheet__content">
+        <div id="nmCartList"></div>
+        <div class="nm-sheet__summary">
+          <div class="nm-sheet__sumRow">
+            <span>Total</span>
+            <strong id="nmSheetTotal">Rp 0</strong>
+          </div>
+          <div class="nm-sheet__actions">
+            <button type="button" class="nm-btn nm-btn--ghost" id="nmClearCart">Kosongkan</button>
+            <button type="button" class="nm-btn nm-btn--primary" id="nmToReview">Lanjut</button>
+          </div>
+          <div class="nm-sheet__hint">Kalau kamu tutup halaman lalu scan lagi, keranjang tetap ada.</div>
+        </div>
       </div>
     </div>
   </div>
-</div>
-<!-- Modal Keranjang -->
-<div class="modal fade" id="cartModal" tabindex="-1">
-  <div class="modal-dialog modal-dialog-scrollable">
-    <div class="modal-content">
-      <div class="modal-header py-2">
-        <h6 class="modal-title">Keranjang Saya</h6>
-        <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+
+  <!-- Add item popup -->
+  <div class="nm-popup" id="nmPopup" hidden>
+    <div class="nm-popup__backdrop" id="nmPopupBackdrop"></div>
+    <div class="nm-popup__panel" role="dialog" aria-modal="true" aria-label="Tambah menu">
+      <div class="nm-popup__head">
+        <div>
+          <div class="nm-popup__title" id="nmPopName">Menu</div>
+          <div class="nm-popup__price" id="nmPopPrice">Rp 0</div>
+        </div>
+        <button type="button" class="nm-iconbtn" id="nmPopClose" aria-label="Tutup">
+          <i class="f7-icons">xmark</i>
+        </button>
       </div>
-      <div class="modal-body" id="cartContent">
-        <!-- Konten keranjang akan di-render di sini -->
+
+      <div class="nm-popup__body">
+        <div class="nm-popup__row">
+          <span>Jumlah</span>
+          <div class="nm-stepper">
+            <button type="button" class="nm-stepper__btn" id="nmQtyMinus" aria-label="Kurangi">-</button>
+            <input id="nmQty" type="number" min="1" value="1">
+            <button type="button" class="nm-stepper__btn" id="nmQtyPlus" aria-label="Tambah">+</button>
+          </div>
+        </div>
+
+        <?php $has_extras = !empty($extras) && is_array($extras); ?>
+        <?php if ($has_extras): ?>
+          <div class="nm-popup__extrasToggle">
+            <button type="button" class="nm-btn nm-btn--ghost nm-btn--block" id="nmToggleExtras">
+              <i class="f7-icons" aria-hidden="true">plus_circle</i>
+              <span id="nmToggleExtrasText">Tambah Extra</span>
+            </button>
+          </div>
+        <?php endif; ?>
+
+        <div class="nm-popup__extras" id="nmExtrasWrap" <?= $has_extras ? 'hidden' : '' ?>>
+          <div class="nm-popup__extrasHead">Extra (opsional)</div>
+          <div class="nm-popup__extrasList" id="nmExtrasList">
+            <?php foreach (($extras ?? []) as $ex): ?>
+              <label class="nm-check">
+                <input
+                  class="nm-extra"
+                  type="checkbox"
+                  value="<?= (int) ($ex['id'] ?? 0) ?>"
+                  data-nama="<?= html_escape((string) ($ex['nama_extra'] ?? '')) ?>"
+                  data-harga="<?= (float) ($ex['harga'] ?? 0) ?>"
+                >
+                <span>
+                  <?= html_escape((string) ($ex['nama_extra'] ?? '')) ?>
+                  <small>+Rp <?= number_format((float) ($ex['harga'] ?? 0), 0, ',', '.') ?></small>
+                </span>
+              </label>
+            <?php endforeach; ?>
+          </div>
+        </div>
       </div>
-      <div class="modal-footer py-2">
-        <button type="button" class="btn btn-sm btn-primary" id="lanjutkanOrder">Lanjutkan</button>
+
+      <div class="nm-popup__foot">
+        <button type="button" class="nm-btn nm-btn--primary nm-btn--block" id="nmAddToCart">Tambah ke keranjang</button>
       </div>
     </div>
   </div>
+
+  <!-- Category sheet -->
+  <div class="nm-sheet nm-sheet--cat" id="nmCatSheet" hidden>
+    <div class="nm-sheet__backdrop" id="nmCatBackdrop"></div>
+    <div class="nm-sheet__panel" id="nmCatPanel" role="dialog" aria-modal="true" aria-label="Kategori">
+      <div class="nm-sheet__handle"></div>
+      <div class="nm-sheet__head">
+        <div class="nm-sheet__title">Kategori</div>
+        <button type="button" class="nm-iconbtn" id="nmCloseCat" aria-label="Tutup">
+          <i class="f7-icons">xmark</i>
+        </button>
+      </div>
+      <div class="nm-sheet__content">
+        <div class="nm-catlist" id="nmCatList">
+          <?php foreach (($kategori ?? []) as $kat): ?>
+            <button
+              type="button"
+              class="nm-catitem"
+              data-kat-id="<?= (int) $kat->id ?>"
+              data-kat-nama="<?= html_escape($kat->nama_kategori) ?>"
+            >
+              <?= html_escape($kat->nama_kategori) ?>
+              <i class="f7-icons" aria-hidden="true">chevron_right</i>
+            </button>
+          <?php endforeach; ?>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <?php $this->load->view('templates/member/bottom_nav'); ?>
 </div>
 
-<!-- Script -->
 <script>
-  const BASE_URL = "<?= base_url() ?>";
-  const cartData = {};
-  let selectedExtras = [];
+  (function () {
+    const BASE_URL = <?= json_encode(base_url(), JSON_UNESCAPED_SLASHES) ?>;
+    const MEJA_ID = <?= (int) ($meja_id ?? 0) ?>;
+    const SERVER_DRAFT = <?= json_encode(is_array($draft_cart ?? null) ? $draft_cart : [], JSON_UNESCAPED_SLASHES) ?>;
+    const SERVER_STEP = <?= json_encode((string) ($flow_step ?? 'menu')) ?>;
 
-  $(document).ready(function() {
-    // Swiper init
-    const swiper = new Swiper('.mySwiper', {
-      slidesPerView: 1,
-      spaceBetween: 20,
-      autoHeight: true,
-      watchSlidesProgress: true
-    });
+    const CART_KEY = 'nm_order_cart_v1_' + String(MEJA_ID || 0);
+    const STEP_KEY = 'nm_order_step_v1_' + String(MEJA_ID || 0);
 
-    // Saat dropdown berubah → ganti slide
-    $('#kategoriSelector').on('change', function() {
-      swiper.slideTo(parseInt($(this).val()));
-    });
+    const elSearch = document.getElementById('nmSearch');
+    const elProduk = document.getElementById('nmProduk');
 
-    // Saat slide di-swipe → update dropdown
-    swiper.on('slideChange', function() {
-      $('#kategoriSelector').val(swiper.activeIndex);
-    });
-    $('#kategoriSelector').on('change', function() {
-      swiper.slideTo(parseInt($(this).val()));
-    });
+    const elCartBar = document.getElementById('nmCartBar');
+    const elCartCount = document.getElementById('nmCartCount');
+    const elCartSub = document.getElementById('nmCartSub');
+    const elCartTotal = document.getElementById('nmCartTotal');
 
-    // Pencarian produk
-    $('#search_produk').on('keyup', function() {
-      const keyword = $(this).val().toLowerCase();
+    const elSheet = document.getElementById('nmCartSheet');
+    const elSheetBackdrop = document.getElementById('nmSheetBackdrop');
+    const elCartList = document.getElementById('nmCartList');
+    const elSheetTotal = document.getElementById('nmSheetTotal');
 
-      $('.swiper-slide').each(function() {
-        let matchInSlide = false;
-        $(this).find('.produk-item').each(function() {
-          const nama = $(this).data('nama');
-          const match = nama.includes(keyword);
-          $(this).toggle(match);
-          if (match) matchInSlide = true;
-        });
+    const elPopup = document.getElementById('nmPopup');
+    const elPopupBackdrop = document.getElementById('nmPopupBackdrop');
+    const elPopName = document.getElementById('nmPopName');
+    const elPopPrice = document.getElementById('nmPopPrice');
+    const elQty = document.getElementById('nmQty');
+    const elExtrasWrap = document.getElementById('nmExtrasWrap');
+    const elToggleExtras = document.getElementById('nmToggleExtras');
+    const elToggleExtrasText = document.getElementById('nmToggleExtrasText');
 
-        // Tampilkan/hidden slide hanya jika ada match
-        if (keyword.length > 0) {
-          $(this).toggle(matchInSlide);
-        } else {
-          $(this).show(); // reset jika input kosong
-        }
-      });
-    });
+    const elActiveCategory = document.getElementById('nmActiveCategory');
+    const elCatSheet = document.getElementById('nmCatSheet');
+    const elCatBackdrop = document.getElementById('nmCatBackdrop');
+    const elCatPanel = document.getElementById('nmCatPanel');
+    const elCatList = document.getElementById('nmCatList');
 
+    const currency = (n) => 'Rp ' + (Number(n || 0)).toLocaleString('id-ID');
 
-    // Klik produk → buka modal
-    $(document).on('click', '.product-card', function() {
-      const id = $(this).data('id');
-      const nama = $(this).data('nama');
-      const harga = $(this).data('harga');
-      const foto = $(this).data('foto');
-
-      $('#modal_produk_id').val(id);
-      $('#modal_nama').text(nama);
-      $('#modal_harga').text('Rp ' + parseInt(harga).toLocaleString('id-ID'));
-      $('#modal_foto').attr('src', 'https://dashboard.namuacoffee.com/uploads/produk/' + foto);
-      $('#modal_jumlah').val(1);
-      $('.extra-option').prop('checked', false);
-      $('#extra_selected').text('Tidak ada');
-      selectedExtras = [];
-      $('#modalOrder').modal('show');
-    });
-
-    // Set extra
-    $('#btnSetExtra').on('click', function() {
-      selectedExtras = [];
-      let labelList = [];
-      $('.extra-option:checked').each(function() {
-        selectedExtras.push($(this).val());
-        labelList.push($(this).data('nama'));
-      });
-      $('#extra_selected').text(labelList.length > 0 ? labelList.join(', ') : 'Tidak ada');
-    });
-
-    // Tambah ke cart
-    $('#btnTambahOrder').on('click', function() {
-      const id = $('#modal_produk_id').val();
-      const nama = $('#modal_nama').text();
-      const harga = parseInt($('#modal_harga').text().replace(/[^\d]/g, ''));
-      const jumlah = parseInt($('#modal_jumlah').val()) || 0;
-
-      const extra_ids = [],
-        extra_nama = [];
-      $('.extra-option:checked').each(function() {
-        extra_ids.push($(this).val());
-        extra_nama.push($(this).data('nama'));
-      });
-
-      cartData[id] = {
-        nama,
-        harga,
-        jumlah,
-        extras: extra_nama
+    const getProdukNode = (produkId) => document.querySelector('[data-produk-id="' + String(produkId) + '"]');
+    const getProdukMeta = (produkId) => {
+      const btn = getProdukNode(produkId);
+      if (!btn) return null;
+      const harga = Number(btn.getAttribute('data-produk-harga') || 0);
+      return {
+        id: Number(btn.getAttribute('data-produk-id')),
+        nama: btn.getAttribute('data-produk-nama') || '',
+        harga: harga,
       };
+    };
 
-      $(`input[name="produk[${id}]"]`).remove();
-      $(`input[name="extra[${id}][]"]`).remove();
+    const normalizeCart = (cart) => {
+      const out = {};
+      if (!cart || typeof cart !== 'object') return out;
+      for (const [k, row] of Object.entries(cart)) {
+        const id = Number(k);
+        const jumlah = Number(row && row.jumlah || 0);
+        if (!Number.isFinite(id) || id <= 0) continue;
+        if (!Number.isFinite(jumlah) || jumlah <= 0) continue;
+        const extra_ids = Array.isArray(row.extra_ids) ? row.extra_ids.map(Number).filter((x) => Number.isFinite(x) && x > 0) : [];
+        out[String(id)] = { jumlah: Math.floor(jumlah), extra_ids: extra_ids };
+      }
+      return out;
+    };
 
-      $('#order_list').append(`<input type="hidden" name="produk[${id}]" value="${jumlah}">`);
-      extra_ids.forEach(extra_id => {
-        $('#order_list').append(`<input type="hidden" name="extra[${id}][]" value="${extra_id}">`);
-      });
+    const cartCount = (cart) => Object.values(cart).reduce((acc, it) => acc + Number(it.jumlah || 0), 0);
 
-      $('#modalOrder').modal('hide');
+    // Cart internal: 1 baris per produk (sengaja, supaya konsisten dengan struktur cart server).
+    // Bentuk: { [produk_id]: { produk_id, jumlah, extra_ids } }
+    let cart = {};
+    let step = 'menu';
 
-      $('#notifToast').toast({
-        delay: 2000
-      });
-      $('#notifToast').toast('show');
+    const loadLocal = () => {
+      try {
+        const raw = localStorage.getItem(CART_KEY);
+        const st = localStorage.getItem(STEP_KEY);
+        const parsed = raw ? JSON.parse(raw) : null;
+        return { cart: parsed, step: st || null };
+      } catch (_) {
+        return { cart: null, step: null };
+      }
+    };
 
-    });
+    const saveLocal = () => {
+      try {
+        localStorage.setItem(CART_KEY, JSON.stringify(cart));
+        localStorage.setItem(STEP_KEY, step);
+      } catch (_) {}
+    };
 
-    // Toggle keranjang
-    $('#cartToggle').on('click', function(e) {
-      e.preventDefault();
-      updateCartDisplay();
-      $('#cartModal').modal('show');
-    });
+    const mergeServerDraft = (serverDraft) => {
+      // serverDraft dari CI: { produk_id: {jumlah, extra_ids} }
+      const d = normalizeCart(serverDraft);
+      const merged = {};
+      for (const [produkId, row] of Object.entries(d)) {
+        merged[String(produkId)] = { produk_id: Number(produkId), jumlah: row.jumlah, extra_ids: row.extra_ids };
+      }
+      return merged;
+    };
 
-    $('#lanjutkanOrder').on('click', function() {
-      $('form').submit();
-    });
-
-    // Update tampilan cart
-    function updateCartDisplay() {
-      let html = '';
+    const computeTotals = () => {
       let total = 0;
-      if (Object.keys(cartData).length === 0) {
-        $('#cartContent').html('<p class="text-muted text-center">Belum ada item</p>');
+      for (const row of Object.values(cart)) {
+        const meta = getProdukMeta(row.produk_id);
+        if (!meta) continue;
+        total += meta.harga * Number(row.jumlah || 0);
+        // extras price: ambil dari checkbox data (static list di page).
+        const extraIds = Array.isArray(row.extra_ids) ? row.extra_ids : [];
+        for (const exId of extraIds) {
+          const ex = document.querySelector('.nm-extra[value="' + String(exId) + '"]');
+          const exHarga = ex ? Number(ex.getAttribute('data-harga') || 0) : 0;
+          total += exHarga * Number(row.jumlah || 0);
+        }
+      }
+      return total;
+    };
+
+    const toServerCart = () => {
+      const out = {};
+      for (const [pid, row] of Object.entries(cart)) {
+        out[String(pid)] = { jumlah: Number(row.jumlah || 0), extra_ids: Array.isArray(row.extra_ids) ? row.extra_ids : [] };
+      }
+      return out;
+    };
+
+    const saveServer = async (forceStep) => {
+      const payload = { cart: toServerCart(), step: forceStep || step };
+      try {
+        await fetch(BASE_URL + 'order/save_cart', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          credentials: 'same-origin',
+        });
+      } catch (_) {}
+    };
+
+    const renderCartBar = () => {
+      const cnt = cartCount(cart);
+      const total = computeTotals();
+      if (cnt <= 0) {
+        elCartBar.hidden = true;
         return;
       }
+      elCartBar.hidden = false;
+      elCartCount.textContent = String(cnt);
+      elCartSub.textContent = String(cnt) + ' item';
+      elCartTotal.textContent = currency(total);
+      elSheetTotal.textContent = currency(total);
+    };
 
-      html += '<ul class="list-group">';
-      for (let id in cartData) {
-        const item = cartData[id];
-        const extras = item.extras.length ? `<br><small>+ ${item.extras.join(', ')}</small>` : '';
-        const subtotal = item.harga * item.jumlah;
-        total += subtotal;
-        html += `<li class="list-group-item d-flex justify-content-between">
-        <div><strong>${item.nama}</strong>${extras}</div>
-        <div>Rp ${subtotal.toLocaleString()}</div>
-      </li>`;
+	    const renderCartSheet = () => {
+	      if (Object.keys(cart).length === 0) {
+	        elCartList.innerHTML = '<div class="nm-empty">Keranjang masih kosong.</div>';
+	        renderCartBar();
+	        return;
+	      }
+
+      const rows = Object.entries(cart).map(([k, row]) => {
+        const meta = getProdukMeta(row.produk_id);
+        if (!meta) return '';
+        const extras = (row.extra_ids || []).map((exId) => {
+          const ex = document.querySelector('.nm-extra[value="' + String(exId) + '"]');
+          const nm = ex ? (ex.getAttribute('data-nama') || '') : '';
+          return nm ? nm : ('Extra #' + String(exId));
+        });
+        const extraLabel = extras.length ? ('<div class="nm-cartitem__extras">+' + extras.map((x) => escapeHtml(x)).join(', ') + '</div>') : '';
+	        return (
+	          '<div class="nm-cartitem">' +
+	            '<div class="nm-cartitem__main">' +
+	              '<div class="nm-cartitem__name">' + escapeHtml(meta.nama) + '</div>' +
+	              extraLabel +
+	              '<div class="nm-cartitem__price">' + currency(meta.harga) + '</div>' +
+	            '</div>' +
+	            '<div class="nm-cartitem__ctrl">' +
+	              '<div class="nm-cartstep" aria-label="Ubah jumlah">' +
+	                '<button type="button" class="nm-mini" data-act="minus" data-key="' + escapeAttr(k) + '" aria-label="Kurangi">-</button>' +
+	                '<div class="nm-cartitem__qty" aria-label="Jumlah">' + String(row.jumlah) + '</div>' +
+	                '<button type="button" class="nm-mini" data-act="plus" data-key="' + escapeAttr(k) + '" aria-label="Tambah">+</button>' +
+	              '</div>' +
+	              '<button type="button" class="nm-mini nm-mini--danger nm-cartitem__del" data-act="del" data-key="' + escapeAttr(k) + '">Hapus</button>' +
+	            '</div>' +
+	          '</div>'
+	        );
+	      }).join('');
+
+      elCartList.innerHTML = rows;
+      renderCartBar();
+    };
+
+    const openSheet = () => {
+      // Track last state as "cart" (local only) so scan ulang bisa balik buka keranjang.
+      step = 'cart';
+      saveLocal();
+      elSheet.hidden = false;
+      document.body.classList.add('nm-no-scroll');
+      renderCartSheet();
+    };
+    const closeSheet = () => {
+      elSheet.hidden = true;
+      document.body.classList.remove('nm-no-scroll');
+      // Kalau user menutup sheet secara normal, anggap balik ke "menu".
+      step = 'menu';
+      saveLocal();
+    };
+
+    const openPopup = () => {
+      elPopup.hidden = false;
+      document.body.classList.add('nm-no-scroll');
+      if (elExtrasWrap) elExtrasWrap.hidden = true;
+      if (elToggleExtrasText) elToggleExtrasText.textContent = 'Tambah Extra';
+    };
+    const closePopup = () => {
+      elPopup.hidden = true;
+      document.body.classList.remove('nm-no-scroll');
+    };
+
+    const escapeHtml = (s) => String(s || '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const escapeAttr = (s) => escapeHtml(s).replace(/"/g, '&quot;');
+
+    // Init cart: merge server + local (local wins).
+    const local = loadLocal();
+    const fromServer = mergeServerDraft(SERVER_DRAFT);
+    cart = Object.assign({}, fromServer, (local.cart && typeof local.cart === 'object' ? local.cart : {}));
+    step = (local.step || SERVER_STEP || 'menu');
+    saveLocal();
+
+    // Auto-resume client-side kalau session hilang tapi localStorage masih ada step.
+    // Supaya "scan lagi" langsung lanjut tanpa kehilangan keranjang.
+    const autoResume = async () => {
+      const hasItems = Object.keys(cart).length > 0;
+      if (!hasItems) return;
+
+      if (step === 'pay') {
+        await saveServer('pay');
+        window.location.href = BASE_URL + 'order/pay';
+        return;
       }
-      html += `</ul><hr><p class="text-end fw-bold">Total: Rp ${total.toLocaleString()}</p>`;
-      $('#cartContent').html(html);
+      if (step === 'review') {
+        await saveServer('review');
+        window.location.href = BASE_URL + 'order/review_session';
+        return;
+      }
+    };
+
+    // Render initial
+    renderCartBar();
+
+    // Kategori: semua produk tetap tampil (dropdown hanya untuk lompat/scroll).
+    (function initCategoryScrollAndDropdown() {
+      const sections = Array.from(document.querySelectorAll('.nm-order__section'));
+      if (!sections.length) return;
+
+      const getKatName = (katId) => {
+        if (!katId) return '';
+        const btn = document.querySelector('.nm-catitem[data-kat-id="' + String(katId) + '"]');
+        // Jangan pakai textContent karena icon Framework7 ikut kebaca ("chevron_right").
+        return btn ? String(btn.getAttribute('data-kat-nama') || '').trim() : '';
+      };
+
+      const setActiveCategory = (katId) => {
+        const nm = getKatName(katId);
+        if (elActiveCategory) elActiveCategory.textContent = nm || 'Semua';
+      };
+
+      // Aktifkan chip berdasarkan posisi scroll.
+      if ('IntersectionObserver' in window) {
+        const io = new IntersectionObserver((entries) => {
+          // Cari section yang paling "visible" di area atas.
+          const visible = entries
+            .filter((e) => e.isIntersecting)
+            .sort((a, b) => (b.intersectionRatio || 0) - (a.intersectionRatio || 0))[0];
+          if (visible && visible.target) {
+            setActiveCategory(visible.target.getAttribute('data-kat-id'));
+          }
+        }, { root: null, threshold: [0.15, 0.25, 0.35], rootMargin: '-120px 0px -60% 0px' });
+
+        sections.forEach((sec) => io.observe(sec));
+      }
+
+      const openCatSheet = () => {
+        if (!elCatSheet) return;
+        elCatSheet.hidden = false;
+        document.body.classList.add('nm-no-scroll');
+      };
+      const closeCatSheet = () => {
+        if (!elCatSheet) return;
+        elCatSheet.hidden = true;
+        document.body.classList.remove('nm-no-scroll');
+      };
+
+      // Dropdown kategori (sheet)
+      const elOpenCategories = document.getElementById('nmOpenCategories');
+      if (elOpenCategories) elOpenCategories.addEventListener('click', openCatSheet);
+      if (document.getElementById('nmCloseCat')) document.getElementById('nmCloseCat').addEventListener('click', closeCatSheet);
+      if (elCatBackdrop) elCatBackdrop.addEventListener('click', closeCatSheet);
+
+      // Klik item kategori = scroll ke section
+      if (elCatList) elCatList.addEventListener('click', (e) => {
+        const btn = e.target.closest('.nm-catitem');
+        if (!btn) return;
+        const katId = btn.getAttribute('data-kat-id');
+        setActiveCategory(katId);
+        const sec = document.querySelector('.nm-order__section[data-kat-id="' + String(katId) + '"]');
+        if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        closeCatSheet();
+      });
+
+      // Swipe down to close (biar sheet bisa "ditutup digeser")
+      if (elCatPanel) {
+        let startY = 0;
+        let moved = 0;
+        elCatPanel.addEventListener('touchstart', (e) => {
+          const t = e.touches && e.touches[0];
+          startY = t ? t.clientY : 0;
+          moved = 0;
+        }, { passive: true });
+        elCatPanel.addEventListener('touchmove', (e) => {
+          const t = e.touches && e.touches[0];
+          const y = t ? t.clientY : 0;
+          moved = Math.max(0, y - startY);
+        }, { passive: true });
+        elCatPanel.addEventListener('touchend', () => {
+          if (moved > 80) closeCatSheet();
+          startY = 0;
+          moved = 0;
+        });
+      }
+
+      // Init label awal
+      const first = sections[0] ? sections[0].getAttribute('data-kat-id') : null;
+      if (first) setActiveCategory(first);
+    })();
+
+    // Save server on load (best-effort)
+    saveServer(step);
+    autoResume();
+
+    // Kalau terakhir user ada di keranjang, buka sheet otomatis.
+    if (step === 'cart' && Object.keys(cart).length > 0) {
+      openSheet();
     }
-  });
+
+    // Search filter (menyaring item, bukan kategori)
+    elSearch.addEventListener('input', () => {
+      const q = String(elSearch.value || '').trim().toLowerCase();
+      document.querySelectorAll('.nm-order__item').forEach((it) => {
+        const nm = (it.getAttribute('data-produk-nama') || '').toLowerCase();
+        it.style.display = (!q || nm.includes(q)) ? '' : 'none';
+      });
+
+      // Saat search, sembunyikan judul kategori biar tidak penuh layar.
+      document.querySelectorAll('.nm-section-head').forEach((h) => {
+        h.style.display = q ? 'none' : '';
+      });
+
+      // Sembunyikan section yang tidak punya item terlihat.
+      document.querySelectorAll('.nm-order__section').forEach((sec) => {
+        const anyVisible = Array.from(sec.querySelectorAll('.nm-order__item')).some((it) => it.style.display !== 'none');
+        sec.style.display = anyVisible ? '' : 'none';
+      });
+    });
+
+    // Popup add product
+    let currentProduk = null;
+    elProduk.addEventListener('click', (e) => {
+      const btn = e.target.closest('.nm-order__item');
+      if (!btn) return;
+      if (btn.disabled || btn.getAttribute('aria-disabled') === 'true') return;
+      const pid = Number(btn.getAttribute('data-produk-id') || 0);
+      const nm = btn.getAttribute('data-produk-nama') || '';
+      const harga = Number(btn.getAttribute('data-produk-harga') || 0);
+
+      currentProduk = { id: pid, nama: nm, harga: harga };
+      elPopName.textContent = nm;
+      elPopPrice.textContent = currency(harga);
+      elQty.value = '1';
+      document.querySelectorAll('.nm-extra').forEach((x) => { x.checked = false; });
+      openPopup();
+    });
+
+    // Toggle extras supaya modal tidak kepanjangan
+    if (elToggleExtras && elExtrasWrap) {
+      elToggleExtras.addEventListener('click', () => {
+        const willShow = Boolean(elExtrasWrap.hidden);
+        elExtrasWrap.hidden = !willShow;
+        if (elToggleExtrasText) elToggleExtrasText.textContent = willShow ? 'Sembunyikan Extra' : 'Tambah Extra';
+        if (willShow) {
+          setTimeout(() => {
+            // Scroll di dalam modal body (lebih stabil daripada scrollIntoView global).
+            const body = elExtrasWrap.closest('.nm-popup__body');
+            if (body) {
+              body.scrollTo({ top: Math.max(0, elExtrasWrap.offsetTop - 8), behavior: 'smooth' });
+            } else {
+              elExtrasWrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+          }, 50);
+        }
+      });
+    }
+
+    document.getElementById('nmPopClose').addEventListener('click', closePopup);
+    elPopupBackdrop.addEventListener('click', closePopup);
+    document.getElementById('nmQtyMinus').addEventListener('click', () => {
+      const v = Math.max(1, Number(elQty.value || 1) - 1);
+      elQty.value = String(v);
+    });
+    document.getElementById('nmQtyPlus').addEventListener('click', () => {
+      const v = Math.max(1, Number(elQty.value || 1) + 1);
+      elQty.value = String(v);
+    });
+
+	    document.getElementById('nmAddToCart').addEventListener('click', async () => {
+	      if (!currentProduk || !currentProduk.id) return;
+	      const jumlah = Math.max(1, Math.floor(Number(elQty.value || 1)));
+	      const extraIds = Array.from(document.querySelectorAll('.nm-extra:checked')).map((x) => Number(x.value)).filter((x) => x > 0);
+	      cart[String(currentProduk.id)] = { produk_id: currentProduk.id, jumlah: jumlah, extra_ids: extraIds };
+	      step = 'menu';
+	      saveLocal();
+	      renderCartBar();
+	      await saveServer('menu');
+	      closePopup();
+	      // Jangan langsung buka keranjang setelah tambah item:
+	      // biar user tetap di daftar menu dan bisa pilih item lain.
+	    });
+
+    // Sheet open/close
+    document.getElementById('nmOpenCart').addEventListener('click', openSheet);
+    document.getElementById('nmCloseCart').addEventListener('click', closeSheet);
+    elSheetBackdrop.addEventListener('click', closeSheet);
+
+    // Sheet actions
+    elCartList.addEventListener('click', async (e) => {
+      const btn = e.target.closest('button[data-act]');
+      if (!btn) return;
+      const act = btn.getAttribute('data-act');
+      const k = btn.getAttribute('data-key');
+      if (!k || !cart[k]) return;
+
+      if (act === 'plus') cart[k].jumlah += 1;
+      if (act === 'minus') cart[k].jumlah = Math.max(1, cart[k].jumlah - 1);
+      if (act === 'del') delete cart[k];
+
+      step = 'menu';
+      saveLocal();
+      renderCartSheet();
+      await saveServer('menu');
+    });
+
+    document.getElementById('nmClearCart').addEventListener('click', async () => {
+      cart = {};
+      step = 'menu';
+      saveLocal();
+      renderCartSheet();
+      await saveServer('menu');
+      closeSheet();
+    });
+
+    document.getElementById('nmToReview').addEventListener('click', async () => {
+      if (Object.keys(cart).length === 0) return;
+      step = 'review';
+      saveLocal();
+      await saveServer('review');
+      window.location.href = BASE_URL + 'order/review_session';
+    });
+  })();
 </script>

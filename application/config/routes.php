@@ -4,6 +4,9 @@ defined('BASEPATH') or exit('No direct script access allowed');
 
 $route['default_controller'] = 'member';
 
+$route['meja/(:num)'] = 'meja/index/$1';
+$route['meja/(:num)/(:any)'] = 'meja/index/$1/$2';
+
 $route['admin'] = 'admin/login';
 $route['customer/(:num)'] = 'Customer/show/$1';
 $route['admin/members'] = 'Admin/members'; // Halaman daftar member

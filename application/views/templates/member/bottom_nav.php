@@ -6,6 +6,11 @@
       <span class="tabbar-label">Home</span>
     </a>
 
+    <a href="<?= site_url('order') ?>" class="tab-link <?= ($active_menu ?? '') === 'order' ? 'tab-link-active' : '' ?>">
+      <i class="f7-icons">cart</i>
+      <span class="tabbar-label">Order</span>
+    </a>
+
     <a href="<?= site_url('poin') ?>" class="tab-link <?= ($active_menu ?? '') === 'poin' ? 'tab-link-active' : '' ?>">
       <i class="f7-icons">star</i>
       <span class="tabbar-label">Poin</span>

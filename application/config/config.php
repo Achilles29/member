@@ -53,6 +53,7 @@ $config['index_page'] = '';
 |
 | WARNING: If you set this to 'PATH_INFO', URIs will always be URL-decoded!
 */
+// Nginx vhost member sudah pakai try_files -> /index.php?$query_string, jadi URL cantik seperti /meja/3 aman dipakai.
 $config['uri_protocol']	= 'REQUEST_URI';
 
 /*
