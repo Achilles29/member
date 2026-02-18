@@ -517,6 +517,9 @@
         if (elActiveCategory) elActiveCategory.textContent = nm || 'Semua';
       };
 
+      // Scroll container (Framework7 pakai .page-content sebagai scroller).
+      const scrollContainer = (elProduk && elProduk.closest('.page-content')) || document.querySelector('.page-content') || document.scrollingElement || document.documentElement;
+
       // Aktifkan chip berdasarkan posisi scroll.
       if ('IntersectionObserver' in window) {
         const io = new IntersectionObserver((entries) => {
@@ -527,7 +530,7 @@
           if (visible && visible.target) {
             setActiveCategory(visible.target.getAttribute('data-kat-id'));
           }
-        }, { root: null, threshold: [0.15, 0.25, 0.35], rootMargin: '-120px 0px -60% 0px' });
+        }, { root: scrollContainer === document.documentElement ? null : scrollContainer, threshold: [0.15, 0.25, 0.35], rootMargin: '-120px 0px -60% 0px' });
 
         sections.forEach((sec) => io.observe(sec));
       }
@@ -550,14 +553,35 @@
       if (elCatBackdrop) elCatBackdrop.addEventListener('click', closeCatSheet);
 
       // Klik item kategori = scroll ke section
+      const scrollToSection = (sec) => {
+        if (!sec) return;
+        const doScroll = () => {
+          if (scrollContainer && typeof scrollContainer.scrollTo === 'function') {
+            const containerTop = scrollContainer.getBoundingClientRect ? scrollContainer.getBoundingClientRect().top : 0;
+            const secTop = sec.getBoundingClientRect ? sec.getBoundingClientRect().top : 0;
+            const currentTop = scrollContainer.scrollTop || 0;
+            const targetTop = currentTop + (secTop - containerTop) - 10;
+            scrollContainer.scrollTo({ top: targetTop, behavior: 'smooth' });
+          } else {
+            sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        };
+
+        // iOS kadang perlu delay setelah sheet ditutup.
+        requestAnimationFrame(() => {
+          doScroll();
+          setTimeout(doScroll, 50);
+        });
+      };
+
       if (elCatList) elCatList.addEventListener('click', (e) => {
         const btn = e.target.closest('.nm-catitem');
         if (!btn) return;
         const katId = btn.getAttribute('data-kat-id');
         setActiveCategory(katId);
         const sec = document.querySelector('.nm-order__section[data-kat-id="' + String(katId) + '"]');
-        if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
         closeCatSheet();
+        setTimeout(() => scrollToSection(sec), 50);
       });
 
       // Swipe down to close (biar sheet bisa "ditutup digeser")

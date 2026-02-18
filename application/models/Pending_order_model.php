@@ -68,4 +68,38 @@ class Pending_order_model extends CI_Model {
 
         return $this->db->where('id', $pending_id)->update('pr_pending_order', $data);
     }
+
+    public function update_payment($pending_id, array $fields)
+    {
+        $pending_id = (int) $pending_id;
+        if ($pending_id <= 0) return false;
+
+        $data = [
+            'updated_at' => date('Y-m-d H:i:s'),
+        ];
+
+        if (array_key_exists('payment_method', $fields) && $this->db->field_exists('payment_method', 'pr_pending_order')) {
+            $data['payment_method'] = $fields['payment_method'];
+        }
+        if (array_key_exists('payment_status', $fields) && $this->db->field_exists('payment_status', 'pr_pending_order')) {
+            $data['payment_status'] = $fields['payment_status'];
+        }
+        if (array_key_exists('payment_provider', $fields) && $this->db->field_exists('payment_provider', 'pr_pending_order')) {
+            $data['payment_provider'] = $fields['payment_provider'];
+        }
+        if (array_key_exists('payment_ref', $fields) && $this->db->field_exists('payment_ref', 'pr_pending_order')) {
+            $data['payment_ref'] = $fields['payment_ref'];
+        }
+        if (array_key_exists('payment_paid_at', $fields) && $this->db->field_exists('payment_paid_at', 'pr_pending_order')) {
+            $data['payment_paid_at'] = $fields['payment_paid_at'];
+        }
+        if (array_key_exists('payment_qr_url', $fields) && $this->db->field_exists('payment_qr_url', 'pr_pending_order')) {
+            $data['payment_qr_url'] = $fields['payment_qr_url'];
+        }
+        if (array_key_exists('payment_qr_string', $fields) && $this->db->field_exists('payment_qr_string', 'pr_pending_order')) {
+            $data['payment_qr_string'] = $fields['payment_qr_string'];
+        }
+
+        return $this->db->where('id', $pending_id)->update('pr_pending_order', $data);
+    }
 }

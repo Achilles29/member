@@ -27,7 +27,7 @@
       <strong>Rp <?= number_format((float) ($total ?? 0), 0, ',', '.') ?></strong>
     </div>
     <div class="nm-order__hint">
-      Pilih metode pembayaran. Default: bayar di kasir. QRIS masih dummy (persiapan integrasi).
+      Pilih metode pembayaran. Default: bayar di kasir. QRIS via Midtrans.
     </div>
   </div>
 
@@ -41,10 +41,16 @@
           <span>Bayar di kasir</span>
         </label>
 
-        <label class="nm-radio">
-          <input type="radio" name="payment_method" value="QRIS">
-          <span>QRIS (dummy)</span>
-        </label>
+        <?php if (!empty($qris_enabled)): ?>
+          <label class="nm-radio">
+            <input type="radio" name="payment_method" value="QRIS">
+            <span>QRIS</span>
+          </label>
+        <?php else: ?>
+          <div class="nm-order__hint" style="margin-top:8px;">
+            QRIS sedang nonaktif. Silakan bayar di kasir.
+          </div>
+        <?php endif; ?>
 
         <div class="nm-form__label" style="margin-top:14px;">Catatan (opsional)</div>
         <textarea name="catatan" rows="3" placeholder="Contoh: tanpa es, kurang manis, dll."></textarea>
@@ -67,4 +73,3 @@
     try { localStorage.setItem(STEP_KEY, 'pay'); } catch (_) {}
   })();
 </script>
-
