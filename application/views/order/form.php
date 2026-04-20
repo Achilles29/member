@@ -181,35 +181,16 @@
           </div>
         </div>
 
-        <?php $has_extras = !empty($extras) && is_array($extras); ?>
-        <?php if ($has_extras): ?>
-          <div class="nm-popup__extrasToggle">
-            <button type="button" class="nm-btn nm-btn--ghost nm-btn--block" id="nmToggleExtras">
-              <i class="f7-icons" aria-hidden="true">plus_circle</i>
-              <span id="nmToggleExtrasText">Tambah Extra</span>
-            </button>
-          </div>
-        <?php endif; ?>
+        <div class="nm-popup__extrasToggle">
+          <button type="button" class="nm-btn nm-btn--ghost nm-btn--block" id="nmToggleExtras" hidden>
+            <i class="f7-icons" aria-hidden="true">plus_circle</i>
+            <span id="nmToggleExtrasText">Tambah Extra</span>
+          </button>
+        </div>
 
-        <div class="nm-popup__extras" id="nmExtrasWrap" <?= $has_extras ? 'hidden' : '' ?>>
-          <div class="nm-popup__extrasHead">Extra (opsional)</div>
-          <div class="nm-popup__extrasList" id="nmExtrasList">
-            <?php foreach (($extras ?? []) as $ex): ?>
-              <label class="nm-check">
-                <input
-                  class="nm-extra"
-                  type="checkbox"
-                  value="<?= (int) ($ex['id'] ?? 0) ?>"
-                  data-nama="<?= html_escape((string) ($ex['nama_extra'] ?? '')) ?>"
-                  data-harga="<?= (float) ($ex['harga'] ?? 0) ?>"
-                >
-                <span>
-                  <?= html_escape((string) ($ex['nama_extra'] ?? '')) ?>
-                  <small>+Rp <?= number_format((float) ($ex['harga'] ?? 0), 0, ',', '.') ?></small>
-                </span>
-              </label>
-            <?php endforeach; ?>
-          </div>
+        <div class="nm-popup__extras" id="nmExtrasWrap" hidden>
+          <div class="nm-popup__extrasHead">Extra</div>
+          <div class="nm-popup__extrasList" id="nmExtrasList"></div>
         </div>
       </div>
 
@@ -257,6 +238,13 @@
     const MEJA_ID = <?= (int) ($meja_id ?? 0) ?>;
     const SERVER_DRAFT = <?= json_encode(is_array($draft_cart ?? null) ? $draft_cart : [], JSON_UNESCAPED_SLASHES) ?>;
     const SERVER_STEP = <?= json_encode((string) ($flow_step ?? 'menu')) ?>;
+    const EXTRA_LOOKUP = <?= json_encode(array_values(array_map(static function ($ex) {
+      return [
+        'id' => (int) ($ex['id'] ?? 0),
+        'nama_extra' => (string) ($ex['nama_extra'] ?? ''),
+        'harga' => (float) ($ex['harga'] ?? 0),
+      ];
+    }, (array)($extras ?? []))), JSON_UNESCAPED_SLASHES) ?>;
 
     const CART_KEY = 'nm_order_cart_v1_' + String(MEJA_ID || 0);
     const STEP_KEY = 'nm_order_step_v1_' + String(MEJA_ID || 0);
@@ -282,6 +270,7 @@
     const elExtrasWrap = document.getElementById('nmExtrasWrap');
     const elToggleExtras = document.getElementById('nmToggleExtras');
     const elToggleExtrasText = document.getElementById('nmToggleExtrasText');
+    const elExtrasList = document.getElementById('nmExtrasList');
 
     const elActiveCategory = document.getElementById('nmActiveCategory');
     const elCatSheet = document.getElementById('nmCatSheet');
@@ -290,6 +279,16 @@
     const elCatList = document.getElementById('nmCatList');
 
     const currency = (n) => 'Rp ' + (Number(n || 0)).toLocaleString('id-ID');
+    const extraLookupMap = {};
+    (EXTRA_LOOKUP || []).forEach((ex) => {
+      const id = Number(ex && ex.id || 0);
+      if (id > 0) {
+        extraLookupMap[id] = {
+          nama: String(ex.nama_extra || ''),
+          harga: Number(ex.harga || 0),
+        };
+      }
+    });
 
     const getProdukNode = (produkId) => document.querySelector('[data-produk-id="' + String(produkId) + '"]');
     const getProdukMeta = (produkId) => {
@@ -358,11 +357,11 @@
         const meta = getProdukMeta(row.produk_id);
         if (!meta) continue;
         total += meta.harga * Number(row.jumlah || 0);
-        // extras price: ambil dari checkbox data (static list di page).
+        // extras price dari lookup map (disinkronkan server).
         const extraIds = Array.isArray(row.extra_ids) ? row.extra_ids : [];
         for (const exId of extraIds) {
-          const ex = document.querySelector('.nm-extra[value="' + String(exId) + '"]');
-          const exHarga = ex ? Number(ex.getAttribute('data-harga') || 0) : 0;
+          const exMeta = extraLookupMap[Number(exId)] || null;
+          const exHarga = exMeta ? Number(exMeta.harga || 0) : 0;
           total += exHarga * Number(row.jumlah || 0);
         }
       }
@@ -414,8 +413,8 @@
         const meta = getProdukMeta(row.produk_id);
         if (!meta) return '';
         const extras = (row.extra_ids || []).map((exId) => {
-          const ex = document.querySelector('.nm-extra[value="' + String(exId) + '"]');
-          const nm = ex ? (ex.getAttribute('data-nama') || '') : '';
+          const exMeta = extraLookupMap[Number(exId)] || null;
+          const nm = exMeta ? (exMeta.nama || '') : '';
           return nm ? nm : ('Extra #' + String(exId));
         });
         const extraLabel = extras.length ? ('<div class="nm-cartitem__extras">+' + extras.map((x) => escapeHtml(x)).join(', ') + '</div>') : '';
@@ -458,11 +457,21 @@
       saveLocal();
     };
 
-    const openPopup = () => {
+    const openPopup = (opts) => {
+      const options = opts && typeof opts === 'object' ? opts : {};
+      const hasExtras = Boolean(options.hasExtras);
+      const showExtras = Boolean(options.showExtras);
       elPopup.hidden = false;
       document.body.classList.add('nm-no-scroll');
-      if (elExtrasWrap) elExtrasWrap.hidden = true;
-      if (elToggleExtrasText) elToggleExtrasText.textContent = 'Tambah Extra';
+      if (elToggleExtras) {
+        elToggleExtras.hidden = !hasExtras;
+      }
+      if (elExtrasWrap) {
+        elExtrasWrap.hidden = !showExtras;
+      }
+      if (elToggleExtrasText) {
+        elToggleExtrasText.textContent = (hasExtras && showExtras) ? 'Sembunyikan Extra' : 'Tambah Extra';
+      }
     };
     const closePopup = () => {
       elPopup.hidden = true;
@@ -639,9 +648,86 @@
       });
     });
 
+    const fetchExtraGroups = async (produkId) => {
+      try {
+        const res = await fetch(
+          BASE_URL + 'order/get_extra_options_produk?produk_id=' + encodeURIComponent(String(produkId)),
+          { credentials: 'same-origin' }
+        );
+        if (!res.ok) return [];
+        const json = await res.json();
+        return Array.isArray(json && json.groups) ? json.groups : [];
+      } catch (_) {
+        return [];
+      }
+    };
+
+    const getSelectedExtraIdsFromPopup = () =>
+      Array.from(document.querySelectorAll('.nm-extra-option:checked'))
+        .map((x) => Number(x.value))
+        .filter((x) => x > 0);
+
+    const validateExtraGroups = (groups) => {
+      for (const g of (groups || [])) {
+        const gid = Number(g && g.id || 0);
+        const min = Number(g && g.min_pilih || 0);
+        const max = Math.max(1, Number(g && g.max_pilih || 1));
+        const name = String(g && g.nama_group || 'Group Extra');
+        const cnt = document.querySelectorAll('.nm-extra-option[data-group-id="' + String(gid) + '"]:checked').length;
+        if (min > 0 && cnt < min) {
+          return { ok: false, message: 'Pilihan extra untuk "' + name + '" minimal ' + String(min) + '.' };
+        }
+        if (cnt > max) {
+          return { ok: false, message: 'Pilihan extra untuk "' + name + '" maksimal ' + String(max) + '.' };
+        }
+      }
+      return { ok: true, message: '' };
+    };
+
+    const renderExtraGroups = (groups, preselectedIds) => {
+      if (!elExtrasList) return;
+      const selected = new Set((preselectedIds || []).map((x) => Number(x)));
+      let html = '';
+      (groups || []).forEach((g) => {
+        const gid = Number(g && g.id || 0);
+        const min = Number(g && g.min_pilih || 0);
+        const max = Math.max(1, Number(g && g.max_pilih || 1));
+        const nama = escapeHtml(String(g && g.nama_group || 'Extra'));
+        const items = Array.isArray(g && g.items) ? g.items : [];
+        html += `<div style="margin-bottom:12px;">
+          <div style="font-weight:600; margin-bottom:4px;">${nama}</div>
+          <div style="font-size:12px; color:#666; margin-bottom:6px;">Min ${min} / Max ${max}</div>`;
+        items.forEach((it) => {
+          const eid = Number(it && it.id || 0);
+          const nm = escapeHtml(String(it && it.nama_extra || 'Extra'));
+          const harga = Number(it && it.harga || 0);
+          extraLookupMap[eid] = { nama: String(it && it.nama_extra || ''), harga: harga };
+          html += `<label class="nm-check">
+            <input class="nm-extra-option" type="checkbox" value="${eid}" data-group-id="${gid}" data-max="${max}" ${selected.has(eid) ? 'checked' : ''}>
+            <span>${nm}<small>+${currency(harga)}</small></span>
+          </label>`;
+        });
+        html += `</div>`;
+      });
+      elExtrasList.innerHTML = html || '<div class="nm-empty">Produk ini tidak punya extra.</div>';
+
+      document.querySelectorAll('.nm-extra-option').forEach((el) => {
+        el.addEventListener('change', (ev) => {
+          const gid = ev.target.getAttribute('data-group-id');
+          const max = Math.max(1, Number(ev.target.getAttribute('data-max') || 1));
+          const checked = Array.from(document.querySelectorAll('.nm-extra-option[data-group-id="' + String(gid) + '"]:checked'));
+          if (checked.length > max) {
+            ev.target.checked = false;
+            alert('Maksimal pilihan extra untuk group ini ' + String(max) + '.');
+          }
+        });
+      });
+    };
+
     // Popup add product
     let currentProduk = null;
-    elProduk.addEventListener('click', (e) => {
+    let currentExtraGroups = [];
+    elProduk.addEventListener('click', async (e) => {
       const btn = e.target.closest('.nm-order__item');
       if (!btn) return;
       if (btn.disabled || btn.getAttribute('aria-disabled') === 'true') return;
@@ -653,8 +739,16 @@
       elPopName.textContent = nm;
       elPopPrice.textContent = currency(harga);
       elQty.value = '1';
-      document.querySelectorAll('.nm-extra').forEach((x) => { x.checked = false; });
-      openPopup();
+
+      const row = cart[String(pid)] || null;
+      const preselected = Array.isArray(row && row.extra_ids) ? row.extra_ids : [];
+      currentExtraGroups = await fetchExtraGroups(pid);
+      renderExtraGroups(currentExtraGroups, preselected);
+      const hasExtras = Boolean(currentExtraGroups && currentExtraGroups.length > 0);
+      openPopup({
+        hasExtras: hasExtras,
+        showExtras: hasExtras
+      });
     });
 
     // Toggle extras supaya modal tidak kepanjangan
@@ -691,7 +785,12 @@
 	    document.getElementById('nmAddToCart').addEventListener('click', async () => {
 	      if (!currentProduk || !currentProduk.id) return;
 	      const jumlah = Math.max(1, Math.floor(Number(elQty.value || 1)));
-	      const extraIds = Array.from(document.querySelectorAll('.nm-extra:checked')).map((x) => Number(x.value)).filter((x) => x > 0);
+        const check = validateExtraGroups(currentExtraGroups);
+        if (!check.ok) {
+          alert(check.message || 'Pilihan extra belum sesuai aturan.');
+          return;
+        }
+	      const extraIds = getSelectedExtraIdsFromPopup();
 	      cart[String(currentProduk.id)] = { produk_id: currentProduk.id, jumlah: jumlah, extra_ids: extraIds };
 	      step = 'menu';
 	      saveLocal();

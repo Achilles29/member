@@ -30,6 +30,10 @@ $route['voucher/add'] = 'voucher/add';
 $route['voucher/edit/(:num)'] = 'voucher/edit/$1';
 $route['voucher/delete/(:num)'] = 'voucher/delete/$1';
 
+$route['transaksi'] = 'transaksi/index';
+$route['transaksi/detail/(:num)'] = 'transaksi/detail/$1';
+$route['transaksi/struk/(:num)'] = 'transaksi/struk/$1';
+
 
 $route['404_override'] = '';
 $route['translate_uri_dashes'] = false;

@@ -147,6 +147,38 @@ class Order extends CI_Controller
         return $qr_url;
     }
 
+    private function midtrans_human_error($resp, $fallback)
+    {
+        $fallback = (string) $fallback;
+        $detail = '';
+
+        if (is_array($resp['json'] ?? null)) {
+            $json = $resp['json'];
+            $status_message = trim((string) ($json['status_message'] ?? ''));
+            $status_code = trim((string) ($json['status_code'] ?? ''));
+
+            if ($status_message !== '') {
+                $detail = $status_message;
+                if ($status_code !== '') {
+                    $detail .= ' (code: ' . $status_code . ')';
+                }
+            }
+        }
+
+        if ($detail === '') {
+            $err = trim((string) ($resp['error'] ?? ''));
+            if ($err !== '') {
+                $detail = $err;
+            }
+        }
+
+        if ($detail === '') {
+            return $fallback;
+        }
+
+        return $fallback . ' Detail: ' . $detail;
+    }
+
     private function midtrans_sync_status($pending_id, $order_id)
     {
         $resp = $this->midtrans_request('GET', '/v2/' . rawurlencode($order_id) . '/status');
@@ -246,6 +278,197 @@ class Order extends CI_Controller
         return $out;
     }
 
+    /**
+     * Ambil opsi extra per-produk dengan skema group (selaras kasir/get_extra_options_produk).
+     */
+    private function fetch_extra_groups_for_produk($produk_id)
+    {
+        $produk_id = (int) $produk_id;
+        if ($produk_id <= 0) {
+            return ['produk_id' => 0, 'divisi_id' => 0, 'groups' => []];
+        }
+
+        if (
+            !$this->db->table_exists('pr_extra_group')
+            || !$this->db->table_exists('pr_extra_group_item')
+            || !$this->db->table_exists('pr_extra_group_produk')
+        ) {
+            return ['produk_id' => $produk_id, 'divisi_id' => 0, 'groups' => []];
+        }
+
+        $divisi_id = (int) $this->db
+            ->select('k.pr_divisi_id')
+            ->from('pr_produk p')
+            ->join('pr_kategori k', 'k.id = p.kategori_id', 'left')
+            ->where('p.id', $produk_id)
+            ->get()
+            ->row('pr_divisi_id');
+
+        $groups = $this->db
+            ->select('g.id, g.nama_group, g.is_wajib, g.min_pilih, g.max_pilih, gp.urutan')
+            ->from('pr_extra_group_produk gp')
+            ->join('pr_extra_group g', 'g.id = gp.pr_extra_group_id', 'left')
+            ->where('gp.pr_produk_id', $produk_id)
+            ->where('g.status', 1)
+            ->order_by('gp.urutan', 'ASC')
+            ->order_by('g.urutan', 'ASC')
+            ->get()
+            ->result_array();
+
+        if (empty($groups)) {
+            return ['produk_id' => $produk_id, 'divisi_id' => $divisi_id, 'groups' => []];
+        }
+
+        $group_ids = array_map(static function ($g) {
+            return (int) $g['id'];
+        }, $groups);
+
+        $this->db
+            ->select('gi.pr_extra_group_id, e.id, e.sku, e.nama_extra, e.satuan, e.harga, e.hpp, e.tipe_extra')
+            ->from('pr_extra_group_item gi')
+            ->join('pr_produk_extra e', 'e.id = gi.pr_produk_extra_id', 'left')
+            ->where_in('gi.pr_extra_group_id', $group_ids)
+            ->group_start()
+                ->where('e.status', 1)
+                ->or_where('e.status', '1')
+                ->or_where('LOWER(e.status)', 'aktif')
+            ->group_end()
+            ->order_by('gi.urutan', 'ASC')
+            ->order_by('e.nama_extra', 'ASC');
+        if ($this->db->field_exists('tampil_member', 'pr_produk_extra')) {
+            $this->db->where('e.tampil_member', 1);
+        }
+        $items = $this->db->get()->result_array();
+
+        $items_by_group = [];
+        foreach ($items as $it) {
+            $gid = (int) ($it['pr_extra_group_id'] ?? 0);
+            if ($gid <= 0) continue;
+            if (!isset($items_by_group[$gid])) {
+                $items_by_group[$gid] = [];
+            }
+            $items_by_group[$gid][] = [
+                'id' => (int) ($it['id'] ?? 0),
+                'sku' => $it['sku'] ?? '',
+                'nama_extra' => $it['nama_extra'] ?? '',
+                'satuan' => $it['satuan'] ?? '',
+                'harga' => (float) ($it['harga'] ?? 0),
+                'hpp' => (float) ($it['hpp'] ?? 0),
+                'tipe_extra' => $it['tipe_extra'] ?? 'ADD',
+            ];
+        }
+
+        foreach ($groups as &$g) {
+            $gid = (int) ($g['id'] ?? 0);
+            $g['id'] = $gid;
+            $g['is_wajib'] = (int) ($g['is_wajib'] ?? 0);
+            $g['min_pilih'] = (int) ($g['min_pilih'] ?? 0);
+            $g['max_pilih'] = (int) ($g['max_pilih'] ?? 1);
+            if ($g['is_wajib'] === 1 && $g['min_pilih'] <= 0) {
+                $g['min_pilih'] = 1;
+            }
+            if ($g['is_wajib'] === 0 && $g['min_pilih'] > 0) {
+                $g['min_pilih'] = 0;
+            }
+            if ($g['max_pilih'] <= 0) {
+                $g['max_pilih'] = 1;
+            }
+            $g['items'] = $items_by_group[$gid] ?? [];
+            unset($g['urutan']);
+        }
+        unset($g);
+
+        return ['produk_id' => $produk_id, 'divisi_id' => $divisi_id, 'groups' => $groups];
+    }
+
+    public function get_extra_options_produk()
+    {
+        $produk_id = (int) $this->input->get('produk_id');
+        $this->json_response($this->fetch_extra_groups_for_produk($produk_id));
+    }
+
+    private function sanitize_extra_ids_for_produk($produk_id, $selected_extra_ids)
+    {
+        $produk_id = (int) $produk_id;
+        $selected_extra_ids = is_array($selected_extra_ids) ? $selected_extra_ids : [];
+        $selected_extra_ids = array_values(array_unique(array_filter(array_map('intval', $selected_extra_ids))));
+
+        $opt = $this->fetch_extra_groups_for_produk($produk_id);
+        $groups = (array) ($opt['groups'] ?? []);
+        if (empty($groups)) {
+            // Tidak ada mapping group untuk produk ini -> extra harus kosong.
+            return ['ok' => true, 'extra_ids' => [], 'message' => null];
+        }
+
+        $allowed_by_group = [];
+        foreach ($groups as $g) {
+            $gid = (int) ($g['id'] ?? 0);
+            $allowed_by_group[$gid] = [];
+            foreach ((array) ($g['items'] ?? []) as $it) {
+                $eid = (int) ($it['id'] ?? 0);
+                if ($eid > 0) $allowed_by_group[$gid][$eid] = true;
+            }
+        }
+
+        $selected_by_group = [];
+        foreach ($selected_extra_ids as $eid) {
+            foreach ($allowed_by_group as $gid => $allowed_map) {
+                if (isset($allowed_map[$eid])) {
+                    if (!isset($selected_by_group[$gid])) $selected_by_group[$gid] = [];
+                    $selected_by_group[$gid][$eid] = true;
+                }
+            }
+        }
+
+        foreach ($groups as $g) {
+            $gid = (int) ($g['id'] ?? 0);
+            $nama_group = (string) ($g['nama_group'] ?? 'Group');
+            $min = (int) ($g['min_pilih'] ?? 0);
+            $max = (int) ($g['max_pilih'] ?? 1);
+            $cnt = isset($selected_by_group[$gid]) ? count($selected_by_group[$gid]) : 0;
+
+            if ($min > 0 && $cnt < $min) {
+                return ['ok' => false, 'extra_ids' => [], 'message' => 'Pilihan extra untuk "' . $nama_group . '" minimal ' . $min . '.'];
+            }
+            if ($max > 0 && $cnt > $max) {
+                return ['ok' => false, 'extra_ids' => [], 'message' => 'Pilihan extra untuk "' . $nama_group . '" maksimal ' . $max . '.'];
+            }
+        }
+
+        // Keep hanya extra yang valid dalam mapping group produk.
+        $clean = [];
+        foreach ($selected_by_group as $gid => $map) {
+            foreach (array_keys($map) as $eid) {
+                $clean[] = (int) $eid;
+            }
+        }
+        $clean = array_values(array_unique($clean));
+
+        return ['ok' => true, 'extra_ids' => $clean, 'message' => null];
+    }
+
+    private function sanitize_cart_extra_rules($cart)
+    {
+        $cart = is_array($cart) ? $cart : [];
+        $out = [];
+        foreach ($cart as $produk_id => $row) {
+            $produk_id = (int) $produk_id;
+            $jumlah = (int) ($row['jumlah'] ?? 0);
+            if ($produk_id <= 0 || $jumlah <= 0) continue;
+
+            $san = $this->sanitize_extra_ids_for_produk($produk_id, $row['extra_ids'] ?? []);
+            if (!$san['ok']) {
+                return ['ok' => false, 'message' => $san['message'], 'cart' => []];
+            }
+
+            $out[$produk_id] = [
+                'jumlah' => $jumlah,
+                'extra_ids' => $san['extra_ids'],
+            ];
+        }
+        return ['ok' => true, 'message' => null, 'cart' => $out];
+    }
+
     private function compute_review_data_from_cart($cart)
     {
         $produk_list = [];
@@ -326,6 +549,12 @@ class Order extends CI_Controller
         }
 
         $cart = $this->normalize_cart($payload['cart'] ?? []);
+        $sanitized = $this->sanitize_cart_extra_rules($cart);
+        if (!$sanitized['ok']) {
+            $this->json_response(['ok' => false, 'error' => 'extra_invalid', 'message' => $sanitized['message']], 422);
+            return;
+        }
+        $cart = $sanitized['cart'];
         $step = strtoupper(trim((string) ($payload['step'] ?? '')));
         $step = strtolower($step);
         if (!in_array($step, ['menu', 'review', 'pay'], true)) {
@@ -401,8 +630,17 @@ class Order extends CI_Controller
             $data['produk_per_kategori'][$kat->id] = $this->Produk_model->get_by_kategori($kat->id);
         }
 
-        // Extras aktif (buat popup pilihan extra).
-        $data['extras'] = $this->db->get_where('pr_produk_extra', ['status' => 'aktif'])->result_array();
+        // Extras aktif (lookup nama/harga untuk render cart; pilihan per-produk tetap lewat group mapping).
+        $this->db->from('pr_produk_extra');
+        $this->db->group_start()
+            ->where('status', 'aktif')
+            ->or_where('status', 1)
+            ->or_where('status', '1')
+        ->group_end();
+        if ($this->db->field_exists('tampil_member', 'pr_produk_extra')) {
+            $this->db->where('tampil_member', 1);
+        }
+        $data['extras'] = $this->db->get()->result_array();
 
         // Ambil info member
         $data['member'] = $this->db->get_where('pr_customer', ['id' => $customer_id])->row_array();
@@ -516,6 +754,12 @@ class Order extends CI_Controller
         $extra = $this->input->post('extra');
 
         $cart = $this->build_cart_from_post($produk, $extra);
+        $sanitized = $this->sanitize_cart_extra_rules($cart);
+        if (!$sanitized['ok']) {
+            $this->session->set_flashdata('error', $sanitized['message']);
+            redirect('order');
+        }
+        $cart = $sanitized['cart'];
         if (empty($cart)) {
             $this->session->set_flashdata('error', 'Tidak ada produk yang dipilih.');
             redirect('order');
@@ -541,8 +785,8 @@ class Order extends CI_Controller
             ];
 
             // Ambil nama extra jika ada
-            if (isset($extra[$produk_id])) {
-                foreach ($extra[$produk_id] as $ex_id) {
+            if (isset($cart[$produk_id]['extra_ids']) && is_array($cart[$produk_id]['extra_ids'])) {
+                foreach ($cart[$produk_id]['extra_ids'] as $ex_id) {
                     $ex = $this->db->get_where('pr_produk_extra', ['id' => $ex_id])->row();
                     if ($ex) {
                         $produk_list[$produk_id]['extra'][] = [
@@ -585,6 +829,12 @@ class Order extends CI_Controller
         }
 
         $cart = $this->normalize_cart($cart);
+        $sanitized = $this->sanitize_cart_extra_rules($cart);
+        if (!$sanitized['ok']) {
+            $this->session->set_flashdata('error', $sanitized['message']);
+            redirect('order');
+        }
+        $cart = $sanitized['cart'];
         [$produk_list, $total] = $this->compute_review_data_from_cart($cart);
         if (empty($produk_list)) {
             $this->session->set_flashdata('error', 'Keranjang kosong. Pilih menu dulu ya.');
@@ -662,6 +912,13 @@ class Order extends CI_Controller
             $this->session->set_flashdata('error', 'Keranjang kosong. Pilih menu dulu ya.');
             redirect('order');
         }
+
+        $sanitized = $this->sanitize_cart_extra_rules($cart);
+        if (!$sanitized['ok']) {
+            $this->session->set_flashdata('error', $sanitized['message']);
+            redirect('order');
+        }
+        $cart = $sanitized['cart'];
 
         $nomor_meja = $this->session->userdata('order_nomor_meja');
         $catatan = $this->input->post('catatan', true);
@@ -772,6 +1029,7 @@ class Order extends CI_Controller
         $this->session->set_userdata('last_pending_order_id', (int) $pending_id);
         $this->session->set_userdata('last_pending_order_payment_method', 'QRIS');
 
+        $payment_ref = (string) ($order['payment_ref'] ?? '');
         $session_key = 'qris_payload_' . (int) $pending_id;
         $qris_payload = $this->session->userdata($session_key);
         if (empty($qris_payload)) {
@@ -786,7 +1044,6 @@ class Order extends CI_Controller
             }
         }
 
-        $payment_ref = (string) ($order['payment_ref'] ?? '');
         $qris_error = null;
 
         if (empty($payment_ref)) {
@@ -837,11 +1094,17 @@ class Order extends CI_Controller
                         'payment_qr_string' => $qris_payload['qr_string'] ?? null,
                     ]);
                 } else {
-                    $qris_error = 'QRIS belum tersedia dari Midtrans. Silakan buat QR baru.';
+                    $qris_error = $this->midtrans_human_error(
+                        $resp,
+                        'QRIS belum tersedia dari Midtrans. Silakan buat QR baru.'
+                    );
                     log_message('error', '[MEMBER][ORDER] midtrans charge tanpa QR: ' . ($resp['body'] ?: 'no-body'));
                 }
             } else {
-                $qris_error = 'Gagal membuat QRIS. Coba ulang beberapa saat lagi.';
+                $qris_error = $this->midtrans_human_error(
+                    $resp,
+                    'Gagal membuat QRIS. Coba ulang beberapa saat lagi.'
+                );
                 log_message('error', '[MEMBER][ORDER] midtrans charge gagal: ' . ($resp['body'] ?: $resp['error']));
             }
         } elseif (empty($qris_payload)) {

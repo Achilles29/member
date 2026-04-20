@@ -1,4 +1,12 @@
 <div class="page-content nm-page">
+  <?php
+    $total_stamp = 0;
+    if (!empty($stamp_list) && is_array($stamp_list)) {
+      foreach ($stamp_list as $s) {
+        $total_stamp += (int)($s['jumlah_stamp'] ?? 0);
+      }
+    }
+  ?>
 
   <!-- TOPBAR -->
   <div class="nm-topbar">
@@ -39,9 +47,9 @@
       <div class="ico"><i class="f7-icons">bookmark</i></div>
       <span>Stamp</span>
     </a>
-    <a class="nm-action" href="<?= site_url('profile') ?>">
-      <div class="ico"><i class="f7-icons">person</i></div>
-      <span>Akun</span>
+    <a class="nm-action" href="<?= site_url('transaksi') ?>">
+      <div class="ico"><i class="f7-icons">doc_text</i></div>
+      <span>Riwayat</span>
     </a>
   </div>
 
@@ -55,7 +63,7 @@
 
     <a class="nm-stat" href="<?= site_url('stamp') ?>">
       <i class="f7-icons">bookmark</i>
-      <div class="nm-stat-num"><?= is_array($stamp_list ?? null) ? count($stamp_list) : 0 ?></div>
+      <div class="nm-stat-num"><?= number_format($total_stamp) ?></div>
       <div class="nm-stat-label">Stamp</div>
     </a>
 

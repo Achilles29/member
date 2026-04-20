@@ -166,6 +166,9 @@ body{
   grid-template-columns:repeat(4,1fr);
   gap:10px;
 }
+.nm-actions > .nm-action:last-child:nth-child(4n + 1){
+  grid-column:2 / span 2;
+}
 .nm-action{
   background:#fff;
   border-radius:16px;
@@ -927,6 +930,195 @@ body{
   text-align:center;
   color:var(--muted);
   font-weight:900;
+}
+
+/* Riwayat transaksi */
+.nm-trx-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+}
+.nm-trx-left{min-width:0;}
+.nm-trx-no{
+  font-weight:1000;
+  font-size:13px;
+  color:var(--text);
+  word-break:break-word;
+}
+.nm-trx-date{
+  margin-top:4px;
+  font-size:12px;
+  color:var(--muted);
+}
+.nm-trx-total{
+  margin-top:8px;
+  font-size:14px;
+  font-weight:1000;
+  color:var(--primary);
+}
+.nm-trx-actions{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  align-items:flex-end;
+}
+.nm-trx-btn{
+  border:none;
+  border-radius:12px;
+  background:var(--primary);
+  color:#fff;
+  text-decoration:none;
+  font-size:12px;
+  font-weight:1000;
+  height:34px;
+  padding:0 12px;
+  display:inline-flex;
+  align-items:center;
+}
+.nm-trx-btn.is-secondary{
+  background:#f3f4f6;
+  color:#374151;
+}
+.nm-trx-item{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  padding:10px 0;
+  border-bottom:1px solid #f1f5f9;
+}
+.nm-trx-item:last-child{border-bottom:none;}
+.nm-trx-item-name{
+  font-size:13px;
+  font-weight:1000;
+  color:var(--text);
+}
+.nm-trx-item-meta{
+  margin-top:4px;
+  font-size:12px;
+  color:var(--muted);
+}
+.nm-trx-item-status{
+  font-weight:900;
+  color:#9ca3af;
+}
+.nm-trx-item-note{
+  margin-top:3px;
+  font-size:12px;
+  color:#6b7280;
+}
+.nm-trx-extra-wrap{
+  margin-top:6px;
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+.nm-trx-extra-line{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:10px;
+  font-size:12px;
+  color:#6b7280;
+}
+.nm-trx-extra-line b{
+  color:#374151;
+  white-space:nowrap;
+}
+.nm-trx-item-subtotal{
+  font-size:12px;
+  font-weight:1000;
+  color:#111827;
+  white-space:nowrap;
+}
+.nm-trx-detail-actions{
+  margin-top:12px;
+  display:flex;
+  gap:10px;
+  justify-content:flex-end;
+}
+.nm-struk-card{
+  font-family:monospace;
+}
+.nm-struk-head{
+  text-align:center;
+}
+.nm-struk-logo-wrap{
+  margin-bottom:8px;
+}
+.nm-struk-logo{
+  max-height:56px;
+  max-width:120px;
+  object-fit:contain;
+}
+.nm-struk-title{
+  font-size:15px;
+  font-weight:1000;
+}
+.nm-struk-line{
+  margin-top:2px;
+  font-size:12px;
+}
+.nm-struk-sep{
+  border-top:1px dashed #9ca3af;
+  margin:10px 0;
+}
+.nm-struk-item{
+  margin:7px 0;
+}
+.nm-struk-item-top{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:10px;
+}
+.nm-struk-item-name{
+  font-size:12px;
+  font-weight:1000;
+}
+.nm-struk-item-meta{
+  font-size:12px;
+  color:#6b7280;
+}
+.nm-struk-item-note{
+  font-size:11px;
+  color:#6b7280;
+  margin-top:2px;
+}
+.nm-struk-extra-line{
+  margin-top:2px;
+  font-size:11px;
+  color:#4b5563;
+  display:flex;
+  justify-content:space-between;
+  gap:8px;
+}
+.nm-struk-extra-line b{
+  color:#111827;
+  white-space:nowrap;
+}
+.nm-struk-item-sub{
+  font-size:12px;
+  font-weight:1000;
+  white-space:nowrap;
+}
+.nm-struk-total{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  font-size:14px;
+}
+.nm-struk-footer{
+  margin-top:12px;
+  text-align:center;
+  font-size:12px;
+}
+
+@media print{
+  .nm-print-hide,
+  .nm-tabbar{display:none !important;}
+  .page-content{padding-bottom:0 !important;}
+  .nm-struk-card{box-shadow:none !important;}
 }
 
 
