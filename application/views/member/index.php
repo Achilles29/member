@@ -1,6 +1,12 @@
 <div class="page-content nm-page">
   <?php
     $total_stamp = 0;
+    $ci = get_instance();
+    $self_order_available = $ci->db->table_exists('crm_member')
+      && $ci->db->table_exists('mst_product')
+      && $ci->db->table_exists('pos_order')
+      && $ci->db->table_exists('pos_order_line')
+      && $ci->db->table_exists('pos_payment');
     if (!empty($stamp_list) && is_array($stamp_list)) {
       foreach ($stamp_list as $s) {
         $total_stamp += (int)($s['jumlah_stamp'] ?? 0);
@@ -47,6 +53,12 @@
       <div class="ico"><i class="f7-icons">bookmark</i></div>
       <span>Stamp</span>
     </a>
+    <?php if ($self_order_available): ?>
+    <a class="nm-action" href="<?= site_url('order') ?>">
+      <div class="ico"><i class="f7-icons">doc_text</i></div>
+      <span>Order</span>
+    </a>
+    <?php endif; ?>
     <a class="nm-action" href="<?= site_url('transaksi') ?>">
       <div class="ico"><i class="f7-icons">doc_text</i></div>
       <span>Riwayat</span>

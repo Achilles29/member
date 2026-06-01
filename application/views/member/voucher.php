@@ -45,8 +45,7 @@
         // desc
         $desc = 'Voucher';
         if ($jenis === 'produk') {
-          $produk = $this->db->get_where('pr_produk', ['id' => $v['produk_id']])->row('nama_produk');
-          $desc = 'Gratis produk: ' . html_escape($produk ?? 'Produk tidak ditemukan');
+          $desc = 'Gratis produk: ' . html_escape($v['produk_nama'] ?? 'Produk tidak ditemukan');
           $badge = 'Produk';
         } elseif ($jenis === 'diskon') {
           $badge = 'Diskon';

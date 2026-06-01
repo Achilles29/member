@@ -4,11 +4,22 @@ defined('BASEPATH') or exit('No direct script access allowed');
 
 class Start extends CI_Controller
 {
+    private $order_schema_ready = false;
+
     public function __construct()
     {
         parent::__construct();
         $this->load->model(['Member_model', 'Customer_model']);
         $this->load->helper('url');
+        $this->order_schema_ready = $this->db->table_exists('crm_member')
+            && $this->db->table_exists('mst_product')
+            && $this->db->table_exists('pos_order')
+            && $this->db->table_exists('pos_order_line')
+            && $this->db->table_exists('pos_payment')
+            && $this->db->table_exists('pos_payment_line')
+            && $this->db->table_exists('pos_payment_method')
+            && $this->db->table_exists('pos_outlet')
+            && $this->db->table_exists('auth_user');
     }
 
     private function safe_redirect_to($redirect_to)
@@ -44,6 +55,17 @@ class Start extends CI_Controller
         if ($meja_id <= 0) {
             show_error('Belum ada meja. Scan QR meja dulu ya.', 400);
             return false;
+        }
+        return true;
+    }
+
+    private function self_order_is_enabled()
+    {
+        if ($this->db->table_exists('pos_self_order_setting')) {
+            $row = $this->db->get_where('pos_self_order_setting', ['id' => 1])->row_array();
+            if ($row) {
+                return ((int)($row['is_enabled'] ?? 1)) === 1;
+            }
         }
         return true;
     }
@@ -84,6 +106,18 @@ class Start extends CI_Controller
 
     public function index()
     {
+        if (!$this->self_order_is_enabled()) {
+            $this->session->set_flashdata('error', 'Order mandiri sedang dinonaktifkan sementara.');
+            redirect('member');
+            return;
+        }
+
+        if (!$this->order_schema_ready) {
+            $this->session->set_flashdata('error', 'Fitur order member belum siap karena tabel POS finance wajib belum lengkap di db_finance.');
+            redirect('member');
+            return;
+        }
+
         if (!$this->require_meja_context()) return;
 
         // Sudah login: jangan ganggu, langsung resume.
@@ -101,6 +135,18 @@ class Start extends CI_Controller
 
     public function check_phone()
     {
+        if (!$this->self_order_is_enabled()) {
+            $this->session->set_flashdata('error', 'Order mandiri sedang dinonaktifkan sementara.');
+            redirect('member');
+            return;
+        }
+
+        if (!$this->order_schema_ready) {
+            $this->session->set_flashdata('error', 'Fitur order member belum siap karena tabel POS finance wajib belum lengkap di db_finance.');
+            redirect('member');
+            return;
+        }
+
         if (!$this->require_meja_context()) return;
 
         $redirect_to = $this->safe_redirect_to($this->input->post('redirect_to'));
@@ -145,6 +191,18 @@ class Start extends CI_Controller
 
     public function register()
     {
+        if (!$this->self_order_is_enabled()) {
+            $this->session->set_flashdata('error', 'Order mandiri sedang dinonaktifkan sementara.');
+            redirect('member');
+            return;
+        }
+
+        if (!$this->order_schema_ready) {
+            $this->session->set_flashdata('error', 'Fitur order member belum siap karena tabel POS finance wajib belum lengkap di db_finance.');
+            redirect('member');
+            return;
+        }
+
         if (!$this->require_meja_context()) return;
 
         $redirect_to = $this->safe_redirect_to($this->input->post('redirect_to'));

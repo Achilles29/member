@@ -3,23 +3,61 @@ defined('BASEPATH') or exit('No direct script access allowed');
 
 class Order extends CI_Controller
 {
+    private $order_schema_ready = false;
 
     public function __construct()
     {
         parent::__construct();
         $this->load->model([
+            'Member_model',
             'Produk_model',
             'Pending_order_model',
             'Pending_order_detail_model',
             'Pending_order_extra_model',
         ]);
         $this->load->helper(['url', 'form']);
+        $this->order_schema_ready = $this->db->table_exists('crm_member')
+            && $this->db->table_exists('mst_product')
+            && $this->db->table_exists('pos_order')
+            && $this->db->table_exists('pos_order_line')
+            && $this->db->table_exists('pos_payment')
+            && $this->db->table_exists('pos_payment_line')
+            && $this->db->table_exists('pos_payment_method')
+            && $this->db->table_exists('pos_outlet')
+            && $this->db->table_exists('auth_user');
 
         $public_methods = ['midtrans_callback'];
         if (!in_array($this->router->method, $public_methods, true)) {
             // Cek login member
             if (!$this->session->userdata('member_id')) {
                 redirect('login?redirect_to=' . urlencode(current_url()));
+                return;
+            }
+
+            if (!$this->self_order_is_enabled()) {
+                if ($this->input->is_ajax_request()) {
+                    $this->json_response([
+                        'ok' => false,
+                        'message' => 'Order mandiri sedang dinonaktifkan sementara.'
+                    ], 503);
+                    return;
+                }
+                $this->session->set_flashdata('error', 'Order mandiri sedang dinonaktifkan sementara.');
+                redirect('member');
+                return;
+            }
+
+            if (!$this->order_schema_ready) {
+                if ($this->input->is_ajax_request()) {
+                    $this->json_response([
+                        'ok' => false,
+                        'message' => 'Fitur order member belum siap karena tabel POS finance wajib belum lengkap di db_finance.'
+                    ], 503);
+                    return;
+                }
+
+                $this->session->set_flashdata('error', 'Fitur order member belum siap karena tabel POS finance wajib belum lengkap di db_finance.');
+                redirect('member');
             }
         }
     }
@@ -30,6 +68,17 @@ class Order extends CI_Controller
             ->set_status_header((int) $status)
             ->set_content_type('application/json', 'utf-8')
             ->set_output(json_encode($payload));
+    }
+
+    private function self_order_is_enabled()
+    {
+        if ($this->db->table_exists('pos_self_order_setting')) {
+            $row = $this->db->get_where('pos_self_order_setting', ['id' => 1])->row_array();
+            if ($row) {
+                return ((int)($row['is_enabled'] ?? 1)) === 1;
+            }
+        }
+        return true;
     }
 
     private function midtrans_config()
@@ -220,15 +269,15 @@ class Order extends CI_Controller
         if ($pending_id <= 0) return [];
 
         $items = [];
-        $details = $this->db->get_where('pr_pending_order_detail', ['pending_order_id' => $pending_id])->result_array();
+        $details = $this->db->get_where('pos_order_line', ['order_id' => $pending_id])->result_array();
         foreach ($details as $d) {
-            $produk = $this->db->get_where('pr_produk', ['id' => (int) ($d['produk_id'] ?? 0)])->row();
+            $produk = $this->get_product_row((int) ($d['product_id'] ?? 0));
             if (!$produk) continue;
 
-            $qty = (int) ($d['jumlah'] ?? 0);
+            $qty = (int) round((float) ($d['qty'] ?? 0));
             if ($qty <= 0) continue;
 
-            $price = (int) round((float) ($produk->harga_jual ?? 0));
+            $price = (int) round((float) ($d['unit_price'] ?? $produk->harga_jual ?? 0));
             $items[] = [
                 'id' => (string) ($produk->id ?? ''),
                 'name' => (string) ($produk->nama_produk ?? 'Produk'),
@@ -236,13 +285,13 @@ class Order extends CI_Controller
                 'quantity' => $qty,
             ];
 
-            $extras = $this->db->get_where('pr_pending_order_extra', ['pending_order_detail_id' => (int) ($d['id'] ?? 0)])->result_array();
+            $extras = $this->db->get_where('pos_order_line_extra', ['order_line_id' => (int) ($d['id'] ?? 0)])->result_array();
             foreach ($extras as $ex) {
-                $extraRow = $this->db->get_where('pr_produk_extra', ['id' => (int) ($ex['extra_id'] ?? 0)])->row();
+                $extraRow = $this->get_extra_row((int) ($ex['extra_id'] ?? 0));
                 if (!$extraRow) continue;
-                $exQty = (int) ($ex['jumlah'] ?? 0);
+                $exQty = (int) round((float) ($ex['qty'] ?? 0));
                 if ($exQty <= 0) continue;
-                $exPrice = (int) round((float) ($ex['harga'] ?? 0));
+                $exPrice = (int) round((float) ($ex['unit_price'] ?? $extraRow->harga ?? 0));
                 $items[] = [
                     'id' => 'EX-' . (int) ($extraRow->id ?? 0),
                     'name' => (string) ($extraRow->nama_extra ?? 'Extra'),
@@ -253,6 +302,70 @@ class Order extends CI_Controller
         }
 
         return $items;
+    }
+
+    private function get_member_row($member_id)
+    {
+        $member = $this->Member_model->get_by_id((int) $member_id);
+        return is_array($member) ? $member : [];
+    }
+
+    private function get_product_row($produk_id)
+    {
+        $produk_id = (int) $produk_id;
+        if ($produk_id <= 0) {
+            return null;
+        }
+
+        $this->db
+            ->select('p.id, p.product_name as nama_produk, p.selling_price as harga_jual, p.photo_path as foto, c.product_division_id as pr_divisi_id', false)
+            ->from('mst_product p')
+            ->join('mst_product_category c', 'c.id = p.product_category_id', 'left')
+            ->where('p.id', $produk_id)
+            ->where('p.is_active', 1);
+        if ($this->db->field_exists('show_in_self_order', 'mst_product')) {
+            $this->db->where('p.show_in_self_order', 1);
+        } else {
+            $this->db->group_start()
+                ->where('p.show_member', 1)
+                ->or_where('p.show_pos', 1)
+                ->group_end();
+        }
+
+        return $this->db->limit(1)->get()->row();
+    }
+
+    private function get_extra_row($extra_id)
+    {
+        $extra_id = (int) $extra_id;
+        if ($extra_id <= 0 || !$this->db->table_exists('mst_extra')) {
+            return null;
+        }
+
+        return $this->db
+            ->select('id, extra_name as nama_extra, selling_price as harga, cost_amount as hpp', false)
+            ->from('mst_extra')
+            ->where('id', $extra_id)
+            ->where('is_active', 1)
+            ->limit(1)
+            ->get()
+            ->row();
+    }
+
+    private function get_active_extras_lookup()
+    {
+        if (!$this->db->table_exists('mst_extra')) {
+            return [];
+        }
+
+        return $this->db
+            ->select('id, extra_name as nama_extra, selling_price as harga', false)
+            ->from('mst_extra')
+            ->where('is_active', 1)
+            ->where('show_in_self_order', 1)
+            ->order_by('id', 'ASC')
+            ->get()
+            ->result_array();
     }
 
     private function normalize_cart($cart)
@@ -289,29 +402,29 @@ class Order extends CI_Controller
         }
 
         if (
-            !$this->db->table_exists('pr_extra_group')
-            || !$this->db->table_exists('pr_extra_group_item')
-            || !$this->db->table_exists('pr_extra_group_produk')
+            !$this->db->table_exists('mst_extra_group')
+            || !$this->db->table_exists('mst_extra_group_item')
+            || !$this->db->table_exists('mst_product_extra_group_map')
         ) {
             return ['produk_id' => $produk_id, 'divisi_id' => 0, 'groups' => []];
         }
 
         $divisi_id = (int) $this->db
-            ->select('k.pr_divisi_id')
-            ->from('pr_produk p')
-            ->join('pr_kategori k', 'k.id = p.kategori_id', 'left')
+            ->select('k.product_division_id')
+            ->from('mst_product p')
+            ->join('mst_product_category k', 'k.id = p.product_category_id', 'left')
             ->where('p.id', $produk_id)
             ->get()
-            ->row('pr_divisi_id');
+            ->row('product_division_id');
 
         $groups = $this->db
-            ->select('g.id, g.nama_group, g.is_wajib, g.min_pilih, g.max_pilih, gp.urutan')
-            ->from('pr_extra_group_produk gp')
-            ->join('pr_extra_group g', 'g.id = gp.pr_extra_group_id', 'left')
-            ->where('gp.pr_produk_id', $produk_id)
-            ->where('g.status', 1)
-            ->order_by('gp.urutan', 'ASC')
-            ->order_by('g.urutan', 'ASC')
+            ->select('g.id, g.group_name as nama_group, g.is_required as is_wajib, g.min_select as min_pilih, g.max_select as max_pilih, m.sort_order as urutan')
+            ->from('mst_product_extra_group_map m')
+            ->join('mst_extra_group g', 'g.id = m.extra_group_id', 'left')
+            ->where('m.product_id', $produk_id)
+            ->where('g.is_active', 1)
+            ->order_by('m.sort_order', 'ASC')
+            ->order_by('g.sort_order', 'ASC')
             ->get()
             ->result_array();
 
@@ -324,20 +437,14 @@ class Order extends CI_Controller
         }, $groups);
 
         $this->db
-            ->select('gi.pr_extra_group_id, e.id, e.sku, e.nama_extra, e.satuan, e.harga, e.hpp, e.tipe_extra')
-            ->from('pr_extra_group_item gi')
-            ->join('pr_produk_extra e', 'e.id = gi.pr_produk_extra_id', 'left')
-            ->where_in('gi.pr_extra_group_id', $group_ids)
-            ->group_start()
-                ->where('e.status', 1)
-                ->or_where('e.status', '1')
-                ->or_where('LOWER(e.status)', 'aktif')
-            ->group_end()
-            ->order_by('gi.urutan', 'ASC')
-            ->order_by('e.nama_extra', 'ASC');
-        if ($this->db->field_exists('tampil_member', 'pr_produk_extra')) {
-            $this->db->where('e.tampil_member', 1);
-        }
+            ->select('gi.extra_group_id as pr_extra_group_id, e.id, e.extra_code as sku, e.extra_name as nama_extra, e.uom_name as satuan, e.selling_price as harga, e.cost_amount as hpp, e.extra_type as tipe_extra')
+            ->from('mst_extra_group_item gi')
+            ->join('mst_extra e', 'e.id = gi.extra_id', 'left')
+            ->where_in('gi.extra_group_id', $group_ids)
+            ->where('e.is_active', 1)
+            ->where('e.show_in_self_order', 1)
+            ->order_by('gi.sort_order', 'ASC')
+            ->order_by('e.extra_name', 'ASC');
         $items = $this->db->get()->result_array();
 
         $items_by_group = [];
@@ -479,7 +586,7 @@ class Order extends CI_Controller
             $jumlah = (int) ($row['jumlah'] ?? 0);
             if ($produk_id <= 0 || $jumlah <= 0) continue;
 
-            $p = $this->db->get_where('pr_produk', ['id' => $produk_id])->row();
+            $p = $this->get_product_row($produk_id);
             if (!$p) continue;
 
             $harga = (float) $p->harga_jual;
@@ -497,7 +604,7 @@ class Order extends CI_Controller
             $extra_ids = $row['extra_ids'] ?? [];
             if (!empty($extra_ids)) {
                 foreach ((array) $extra_ids as $ex_id) {
-                    $ex = $this->db->get_where('pr_produk_extra', ['id' => (int) $ex_id])->row();
+                    $ex = $this->get_extra_row((int) $ex_id);
                     if (!$ex) continue;
                     $item['extra'][] = [
                         'nama' => (string) $ex->nama_extra,
@@ -630,20 +737,10 @@ class Order extends CI_Controller
             $data['produk_per_kategori'][$kat->id] = $this->Produk_model->get_by_kategori($kat->id);
         }
 
-        // Extras aktif (lookup nama/harga untuk render cart; pilihan per-produk tetap lewat group mapping).
-        $this->db->from('pr_produk_extra');
-        $this->db->group_start()
-            ->where('status', 'aktif')
-            ->or_where('status', 1)
-            ->or_where('status', '1')
-        ->group_end();
-        if ($this->db->field_exists('tampil_member', 'pr_produk_extra')) {
-            $this->db->where('tampil_member', 1);
-        }
-        $data['extras'] = $this->db->get()->result_array();
+        $data['extras'] = $this->get_active_extras_lookup();
 
         // Ambil info member
-        $data['member'] = $this->db->get_where('pr_customer', ['id' => $customer_id])->row_array();
+        $data['member'] = $this->get_member_row($customer_id);
 
         // Draft cart untuk initial state (dipakai JS).
         $data['draft_cart'] = $this->session->userdata('order_draft_cart');
@@ -683,7 +780,7 @@ class Order extends CI_Controller
     {
         $total = 0;
         foreach ((array) $cart as $produk_id => $row) {
-            $produk = $this->db->get_where('pr_produk', ['id' => (int) $produk_id])->row();
+            $produk = $this->get_product_row((int) $produk_id);
             if (!$produk) continue;
 
             $jumlah = (int) ($row['jumlah'] ?? 0);
@@ -695,7 +792,7 @@ class Order extends CI_Controller
             $extra_ids = $row['extra_ids'] ?? [];
             if (!empty($extra_ids)) {
                 foreach ((array) $extra_ids as $ex_id) {
-                    $ex = $this->db->get_where('pr_produk_extra', ['id' => (int) $ex_id])->row();
+                    $ex = $this->get_extra_row((int) $ex_id);
                     if (!$ex) continue;
                     $total += ((float) $ex->harga) * $jumlah;
                 }
@@ -715,7 +812,7 @@ class Order extends CI_Controller
         $customer_id = $this->session->userdata('member_id');
         $data['title'] = 'Order Terkirim';
         $data['active_menu'] = 'order';
-        $data['member'] = $this->db->get_where('pr_customer', ['id' => $customer_id])->row_array();
+        $data['member'] = $this->get_member_row($customer_id);
         $data['nomor_meja'] = $this->session->userdata('order_nomor_meja');
         $data['meja_id'] = (int) ($this->session->userdata('order_meja_id') ?? 0);
         $data['pending_order'] = null;
@@ -723,10 +820,7 @@ class Order extends CI_Controller
 
         $pending_id = (int) ($this->session->userdata('last_pending_order_id') ?? 0);
         if ($pending_id > 0) {
-            $data['pending_order'] = $this->db->get_where('pr_pending_order', [
-                'id' => $pending_id,
-                'customer_id' => (int) $customer_id,
-            ])->row_array();
+            $data['pending_order'] = $this->Pending_order_model->get_for_member($pending_id, (int) $customer_id);
         }
 
         $this->load->view('templates/member/header', $data);
@@ -769,7 +863,7 @@ class Order extends CI_Controller
         $total = 0;
 
         foreach ($produk as $produk_id => $jumlah) {
-            $row = $this->db->get_where('pr_produk', ['id' => $produk_id])->row();
+            $row = $this->get_product_row((int) $produk_id);
             if (!$row) continue;
 
             $harga = $row->harga_jual;
@@ -787,7 +881,7 @@ class Order extends CI_Controller
             // Ambil nama extra jika ada
             if (isset($cart[$produk_id]['extra_ids']) && is_array($cart[$produk_id]['extra_ids'])) {
                 foreach ($cart[$produk_id]['extra_ids'] as $ex_id) {
-                    $ex = $this->db->get_where('pr_produk_extra', ['id' => $ex_id])->row();
+                    $ex = $this->get_extra_row((int) $ex_id);
                     if ($ex) {
                         $produk_list[$produk_id]['extra'][] = [
                             'nama' => $ex->nama_extra,
@@ -851,7 +945,7 @@ class Order extends CI_Controller
             'nomor_meja' => $this->session->userdata('order_nomor_meja'),
             'produk_list' => $produk_list,
             'total' => $total,
-            'member' => $this->db->get_where('pr_customer', ['id' => $customer_id])->row_array(),
+            'member' => $this->get_member_row($customer_id),
         ];
 
         $this->load->view('templates/member/header', $data);
@@ -957,9 +1051,9 @@ class Order extends CI_Controller
                 $extra_ids = $row['extra_ids'] ?? [];
                 if (!empty($extra_ids) && $detail_id > 0) {
                     foreach ((array) $extra_ids as $ex_id) {
-                        $ex = $this->db->get_where('pr_produk_extra', ['id' => (int) $ex_id])->row();
+                        $ex = $this->get_extra_row((int) $ex_id);
                         if (!$ex) continue;
-                        $this->Pending_order_extra_model->insert_extra($detail_id, (int) $ex_id, 1, (float) $ex->harga);
+                        $this->Pending_order_extra_model->insert_extra($detail_id, (int) $ex_id, $jumlah, (float) $ex->harga);
                     }
                 }
             }
@@ -1008,10 +1102,7 @@ class Order extends CI_Controller
             return;
         }
 
-        $order = $this->db->get_where('pr_pending_order', [
-            'id' => $pending_id,
-            'customer_id' => $customer_id,
-        ])->row_array();
+        $order = $this->Pending_order_model->get_for_member($pending_id, $customer_id);
 
         if (!$order) {
             show_error('Order tidak ditemukan.', 404);
@@ -1140,10 +1231,7 @@ class Order extends CI_Controller
             return;
         }
 
-        $order = $this->db->get_where('pr_pending_order', [
-            'id' => $pending_id,
-            'customer_id' => $customer_id,
-        ])->row_array();
+        $order = $this->Pending_order_model->get_for_member($pending_id, $customer_id);
 
         if (!$order) {
             $this->json_response(['ok' => false, 'message' => 'Order tidak ditemukan.'], 404);
@@ -1177,10 +1265,7 @@ class Order extends CI_Controller
             return;
         }
 
-        $order = $this->db->get_where('pr_pending_order', [
-            'id' => $pending_id,
-            'customer_id' => $customer_id,
-        ])->row_array();
+        $order = $this->Pending_order_model->get_for_member($pending_id, $customer_id);
 
         if (!$order) {
             show_error('Order tidak ditemukan.', 404);
@@ -1213,10 +1298,7 @@ class Order extends CI_Controller
             return;
         }
 
-        $order = $this->db->get_where('pr_pending_order', [
-            'id' => $pending_id,
-            'customer_id' => $customer_id,
-        ])->row_array();
+        $order = $this->Pending_order_model->get_for_member($pending_id, $customer_id);
 
         if (!$order) {
             show_error('Order tidak ditemukan.', 404);
@@ -1261,9 +1343,7 @@ class Order extends CI_Controller
         }
 
         if ($pending_id <= 0) {
-            $row = $this->db->get_where('pr_pending_order', [
-                'payment_ref' => $order_id,
-            ])->row_array();
+            $row = $this->Pending_order_model->get_by_payment_ref($order_id);
             $pending_id = (int) ($row['id'] ?? 0);
         }
 

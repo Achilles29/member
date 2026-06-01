@@ -11,44 +11,51 @@ defined('BASEPATH') or exit('No direct script access allowed');
  */
 class Customer_model extends CI_Model
 {
-    protected $table = 'crm_customer';
-    protected $table_member = 'crm_member_account';
+    protected $table = 'crm_member';
+
+    private function map_row($row)
+    {
+        if (empty($row)) {
+            return null;
+        }
+
+        $row['nama'] = $row['member_name'] ?? '';
+        $row['telepon'] = $row['mobile_phone'] ?? '';
+        $row['jenis_kelamin'] = $row['gender'] ?? null;
+        $row['tanggal_lahir'] = $row['birth_date'] ?? null;
+        $row['alamat'] = $row['address'] ?? null;
+        $row['kode_pelanggan'] = $row['member_no'] ?? null;
+        $row['member_status'] = $row['member_status'] ?? 'ACTIVE';
+        $row['name'] = $row['nama'];
+        $row['phone'] = $row['telepon'];
+
+        return $row;
+    }
 
     /**
      * Insert new customer
      */
     public function insert_customer($data)
     {
-        // Map to new structure
         $customer_data = [
-            'customer_code' => $data['kode_pelanggan'] ?? $this->generate_customer_code(),
-            'customer_name' => $data['nama'] ?? '',
-            'phone' => $data['telepon'] ?? '',
+            'member_no' => $data['kode_pelanggan'] ?? $this->generate_customer_code(),
+            'member_name' => $data['nama'] ?? '',
+            'mobile_phone' => $data['telepon'] ?? '',
             'email' => $data['email'] ?? null,
             'birth_date' => $data['tanggal_lahir'] ?? null,
             'gender' => $this->map_gender($data['jenis_kelamin'] ?? null),
             'address' => $data['alamat'] ?? null,
+            'member_tier' => 'Silver',
+            'member_status' => 'ACTIVE',
             'is_active' => 1,
+            'joined_at' => date('Y-m-d H:i:s'),
             'created_at' => date('Y-m-d H:i:s')
         ];
 
         $ok = $this->db->insert($this->table, $customer_data);
         if (!$ok) return false;
-        
-        $customer_id = (int)$this->db->insert_id();
-        
-        // Create member account
-        $member_data = [
-            'member_no' => $customer_data['customer_code'],
-            'customer_id' => $customer_id,
-            'tier_code' => 'SILVER',
-            'status' => 'ACTIVE',
-            'joined_at' => date('Y-m-d H:i:s')
-        ];
-        
-        $this->db->insert($this->table_member, $member_data);
-        
-        return $customer_id;
+
+        return (int)$this->db->insert_id();
     }
 
     /**
@@ -56,23 +63,9 @@ class Customer_model extends CI_Model
      */
     public function get_customer_by_telepon($telepon)
     {
-        $this->db->select('c.*, m.member_no, m.tier_code, m.status as member_status');
-        $this->db->from($this->table . ' c');
-        $this->db->join($this->table_member . ' m', 'm.customer_id = c.id', 'left');
-        $this->db->where('c.phone', $telepon);
-        
-        $result = $this->db->get()->row_array();
-        
-        if ($result) {
-            // Map back to old field names for compatibility
-            $result['nama'] = $result['customer_name'];
-            $result['telepon'] = $result['phone'];
-            $result['jenis_kelamin'] = $this->reverse_map_gender($result['gender'] ?? null);
-            $result['tanggal_lahir'] = $result['birth_date'];
-            $result['alamat'] = $result['address'];
-        }
-        
-        return $result;
+        $result = $this->db->get_where($this->table, ['mobile_phone' => $telepon])->row_array();
+
+        return $this->map_row($result);
     }
 
     /**
@@ -80,24 +73,9 @@ class Customer_model extends CI_Model
      */
     public function get_customer_by_id($id)
     {
-        $this->db->select('c.*, m.member_no, m.tier_code, m.status as member_status');
-        $this->db->from($this->table . ' c');
-        $this->db->join($this->table_member . ' m', 'm.customer_id = c.id', 'left');
-        $this->db->where('c.id', $id);
-        
-        $result = $this->db->get()->row_array();
-        
-        if ($result) {
-            // Map back to old field names
-            $result['nama'] = $result['customer_name'];
-            $result['telepon'] = $result['phone'];
-            $result['jenis_kelamin'] = $this->reverse_map_gender($result['gender'] ?? null);
-            $result['tanggal_lahir'] = $result['birth_date'];
-            $result['alamat'] = $result['address'];
-            $result['kode_pelanggan'] = $result['customer_code'];
-        }
-        
-        return $result;
+        $result = $this->db->get_where($this->table, ['id' => $id])->row_array();
+
+        return $this->map_row($result);
     }
 
     /**
@@ -106,10 +84,28 @@ class Customer_model extends CI_Model
     public function get_last_by_date($tanggal)
     {
         $prefix = $tanggal;
-        $this->db->like('customer_code', $prefix, 'after');
+        $this->db->like('member_no', $prefix, 'after');
         $this->db->from($this->table);
-        
+
         return $this->db->count_all_results();
+    }
+
+    public function get_customer($id)
+    {
+        return $this->get_customer_by_id($id);
+    }
+
+    public function get_stamps($id)
+    {
+        return $this->db
+            ->select('id, created_at as stamp_date')
+            ->from('pos_stamp_ledger')
+            ->where('member_id', $id)
+            ->where('ledger_type', 'EARN')
+            ->where('stamp_in >', 0)
+            ->order_by('created_at', 'ASC')
+            ->get()
+            ->result_array();
     }
 
     /**
@@ -128,9 +124,9 @@ class Customer_model extends CI_Model
      */
     private function map_gender($jenis_kelamin)
     {
-        if ($jenis_kelamin === 'L') return 'MALE';
-        if ($jenis_kelamin === 'P') return 'FEMALE';
-        return 'OTHER';
+        if ($jenis_kelamin === 'L') return 'L';
+        if ($jenis_kelamin === 'P') return 'P';
+        return null;
     }
 
     /**
@@ -138,8 +134,8 @@ class Customer_model extends CI_Model
      */
     private function reverse_map_gender($gender)
     {
-        if ($gender === 'MALE') return 'L';
-        if ($gender === 'FEMALE') return 'P';
+        if ($gender === 'L') return 'L';
+        if ($gender === 'P') return 'P';
         return null;
     }
 }

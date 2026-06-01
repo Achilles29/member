@@ -53,18 +53,10 @@ public function index()
             redirect('redeem');
         }
 
-        // Proses potong poin/stamp
-        $isValid = $this->Redeem_model->potong_saldo($member_id, $redeem);
-        if (!$isValid) {
+        if (!$this->Redeem_model->process_redeem($member_id, $redeem)) {
             $this->session->set_flashdata('error', ucfirst($redeem['jenis']) . ' tidak mencukupi.');
             redirect('redeem');
         }
-
-        // Simpan voucher
-        $voucher_id = $this->Redeem_model->simpan_voucher($member_id, $redeem);
-
-        // Simpan log redeem
-        $this->Redeem_model->log_redeem($member_id, $redeem, $voucher_id);
 
         $this->session->set_flashdata('success', 'Redeem berhasil! Voucher telah dibuat.');
         redirect('redeem');

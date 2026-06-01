@@ -72,8 +72,7 @@
           // Deskripsi voucher
           $desc = '';
           if (($item['jenis_voucher'] ?? '') === 'produk' && !empty($item['produk_id'])) {
-            $produk = $this->db->get_where('pr_produk', ['id' => $item['produk_id']])->row_array();
-            $desc = 'Produk: ' . html_escape($produk['nama_produk'] ?? 'Produk tidak ditemukan');
+            $desc = 'Produk: ' . html_escape($item['produk_nama'] ?? 'Produk tidak ditemukan');
           } elseif (($item['jenis_voucher'] ?? '') === 'diskon') {
             if (($item['tipe_diskon'] ?? '') === 'persentase') {
               $max = number_format((int)($item['max_diskon'] ?? 0), 0, ',', '.');
@@ -134,8 +133,7 @@
 
           $desc = '';
           if (($item['jenis_voucher'] ?? '') === 'produk' && !empty($item['produk_id'])) {
-            $produk = $this->db->get_where('pr_produk', ['id' => $item['produk_id']])->row_array();
-            $desc = 'Produk: ' . html_escape($produk['nama_produk'] ?? 'Produk tidak ditemukan');
+            $desc = 'Produk: ' . html_escape($item['produk_nama'] ?? 'Produk tidak ditemukan');
           } elseif (($item['jenis_voucher'] ?? '') === 'diskon') {
             if (($item['tipe_diskon'] ?? '') === 'persentase') {
               $max = number_format((int)($item['max_diskon'] ?? 0), 0, ',', '.');

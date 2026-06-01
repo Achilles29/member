@@ -9,13 +9,13 @@ class Transaksi_model extends CI_Model
         $start = $month . '-01';
         $end = date('Y-m-t', strtotime($start));
 
-        $this->db->from('pr_transaksi t');
-        $this->db->where('t.customer_id', $customer_id);
-        $this->db->where('t.tanggal >=', $start);
-        $this->db->where('t.tanggal <=', $end);
+        $this->db->from('pos_order o');
+        $this->db->where('o.member_id', $customer_id);
+        $this->db->where('DATE(o.ordered_at) >=', $start);
+        $this->db->where('DATE(o.ordered_at) <=', $end);
 
         if ($search !== '') {
-            $this->db->like('t.no_transaksi', $search);
+            $this->db->like('o.order_no', $search);
         }
     }
 
@@ -28,18 +28,18 @@ class Transaksi_model extends CI_Model
     public function get_list_by_customer($customer_id, $month, $search = '', $limit = 10, $offset = 0)
     {
         $this->db->select('
-            t.id,
-            t.no_transaksi,
-            t.tanggal,
-            t.waktu_order,
-            t.waktu_bayar,
-            t.total_penjualan,
-            t.total_pembayaran,
-            t.status_pembayaran
+            o.id,
+            o.order_no AS no_transaksi,
+            DATE(o.ordered_at) AS tanggal,
+            o.ordered_at AS waktu_order,
+            o.paid_at AS waktu_bayar,
+            o.grand_total AS total_penjualan,
+            COALESCE(o.paid_total, o.grand_total) AS total_pembayaran,
+            o.status AS status_pembayaran
         ');
         $this->apply_list_filter($customer_id, $month, trim((string)$search));
-        $this->db->order_by('t.tanggal', 'DESC');
-        $this->db->order_by('t.id', 'DESC');
+        $this->db->order_by('o.ordered_at', 'DESC');
+        $this->db->order_by('o.id', 'DESC');
 
         if ($limit !== 'semua') {
             $this->db->limit((int)$limit, (int)$offset);
@@ -52,17 +52,27 @@ class Transaksi_model extends CI_Model
     {
         return $this->db
             ->select("
-                t.*,
+                o.id,
+                o.order_no AS no_transaksi,
+                DATE(o.ordered_at) AS tanggal,
+                o.ordered_at AS waktu_order,
+                o.paid_at AS waktu_bayar,
+                o.grand_total AS total_penjualan,
+                COALESCE(o.paid_total, o.grand_total) AS total_pembayaran,
+                o.status AS status_pembayaran,
+                o.notes,
                 (
-                    SELECT GROUP_CONCAT(DISTINCT mp.metode_pembayaran ORDER BY mp.metode_pembayaran SEPARATOR ', ')
-                    FROM pr_pembayaran pb
-                    LEFT JOIN pr_metode_pembayaran mp ON mp.id = pb.metode_id
-                    WHERE pb.transaksi_id = t.id
+                    SELECT GROUP_CONCAT(DISTINCT pm.method_name ORDER BY pm.method_name SEPARATOR ', ')
+                    FROM pos_payment p
+                    LEFT JOIN pos_payment_line pl ON pl.payment_id = p.id
+                    LEFT JOIN pos_payment_method pm ON pm.id = pl.payment_method_id
+                    WHERE p.order_id = o.id
+                        AND p.payment_status <> 'VOID'
                 ) AS metode_pembayaran
             ", false)
-            ->from('pr_transaksi t')
-            ->where('t.id', (int)$id)
-            ->where('t.customer_id', (int)$customer_id)
+            ->from('pos_order o')
+            ->where('o.id', (int)$id)
+            ->where('o.member_id', (int)$customer_id)
             ->get()
             ->row_array();
     }
@@ -71,21 +81,20 @@ class Transaksi_model extends CI_Model
     {
         $items = $this->db
             ->select('
-                d.id,
-                d.jumlah,
-                d.harga,
-                d.status,
-                d.catatan,
-                p.nama_produk
+                l.id,
+                l.qty AS jumlah,
+                l.unit_price AS harga,
+                l.line_status AS status,
+                l.notes AS catatan,
+                p.product_name AS nama_produk
             ')
-            ->from('pr_detail_transaksi d')
-            ->join('pr_produk p', 'p.id = d.pr_produk_id', 'left')
-            ->where('d.pr_transaksi_id', (int)$transaksi_id)
-            ->group_start()
-                ->where('d.status', 'BERHASIL')
-                ->or_where('d.status IS NULL', null, false)
-            ->group_end()
-            ->order_by('d.id', 'ASC')
+            ->from('pos_order_line l')
+            ->join('mst_product p', 'p.id = l.product_id', 'left')
+            ->where('l.order_id', (int)$transaksi_id)
+            ->where('l.line_type', 'PRODUCT')
+            ->where('l.line_status <>', 'VOID')
+            ->order_by('l.line_no', 'ASC')
+            ->order_by('l.id', 'ASC')
             ->get()
             ->result_array();
 
@@ -99,18 +108,15 @@ class Transaksi_model extends CI_Model
 
         $extra_rows = $this->db
             ->select('
-                e.detail_transaksi_id,
-                e.jumlah,
-                e.harga,
-                pe.nama_extra
+                e.order_line_id AS detail_transaksi_id,
+                e.qty AS jumlah,
+                e.unit_price AS harga,
+                mx.extra_name AS nama_extra
             ')
-            ->from('pr_detail_extra e')
-            ->join('pr_produk_extra pe', 'pe.id = e.pr_produk_extra_id', 'left')
-            ->where_in('e.detail_transaksi_id', $detail_ids)
-            ->group_start()
-                ->where('e.status', 'BERHASIL')
-                ->or_where('e.status IS NULL', null, false)
-            ->group_end()
+            ->from('pos_order_line_extra e')
+            ->join('mst_extra mx', 'mx.id = e.extra_id', 'left')
+            ->where_in('e.order_line_id', $detail_ids)
+            ->order_by('e.line_no', 'ASC')
             ->order_by('e.id', 'ASC')
             ->get()
             ->result_array();
@@ -140,6 +146,10 @@ class Transaksi_model extends CI_Model
 
     public function get_outlet_struk()
     {
-        return $this->db->order_by('id', 'DESC')->get('pr_struk')->row_array();
+        return $this->db
+            ->select('outlet_name AS nama_outlet, address AS alamat, phone AS no_telepon, notes AS custom_footer', false)
+            ->order_by('id', 'ASC')
+            ->get('pos_outlet')
+            ->row_array();
     }
 }

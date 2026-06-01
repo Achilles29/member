@@ -1,3 +1,11 @@
+<?php
+$ci = get_instance();
+$self_order_available = $ci->db->table_exists('crm_member')
+  && $ci->db->table_exists('mst_product')
+  && $ci->db->table_exists('pos_order')
+  && $ci->db->table_exists('pos_order_line')
+  && $ci->db->table_exists('pos_payment');
+?>
 <div class="toolbar tabbar tabbar-labels toolbar-bottom nm-tabbar">
   <div class="toolbar-inner">
 
@@ -6,10 +14,12 @@
       <span class="tabbar-label">Home</span>
     </a>
 
+    <?php if ($self_order_available): ?>
     <a href="<?= site_url('order') ?>" class="tab-link <?= ($active_menu ?? '') === 'order' ? 'tab-link-active' : '' ?>">
       <i class="f7-icons">cart</i>
       <span class="tabbar-label">Order</span>
     </a>
+    <?php endif; ?>
 
     <a href="<?= site_url('poin') ?>" class="tab-link <?= ($active_menu ?? '') === 'poin' ? 'tab-link-active' : '' ?>">
       <i class="f7-icons">star</i>
