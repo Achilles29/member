@@ -310,6 +310,7 @@ class Pending_order_model extends CI_Model {
             'paid_total' => $payment_status === 'PAID' ? $grand_total : 0,
             'change_total' => 0,
             'notes' => $catatan ? trim((string) $catatan) : null,
+            'table_no' => $nomor_meja ? trim((string) $nomor_meja) : null,
         ];
 
         $this->db->insert($this->table_order, $data);

@@ -90,8 +90,15 @@ class Order extends CI_Controller
             'is_enabled' => false,
         ];
 
-        if ($this->db->table_exists('pr_qris_setting')) {
-            $row = $this->db->get_where('pr_qris_setting', ['id' => 1])->row_array();
+        $qrisTable = null;
+        if ($this->db->table_exists('pos_self_order_qris_setting')) {
+            $qrisTable = 'pos_self_order_qris_setting';
+        } elseif ($this->db->table_exists('pr_qris_setting')) {
+            $qrisTable = 'pr_qris_setting';
+        }
+
+        if ($qrisTable !== null) {
+            $row = $this->db->get_where($qrisTable, ['id' => 1])->row_array();
             if ($row) {
                 $cfg['server_key'] = (string) ($row['midtrans_server_key'] ?? '');
                 $cfg['client_key'] = (string) ($row['midtrans_client_key'] ?? '');

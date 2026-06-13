@@ -12,15 +12,23 @@ class Meja extends CI_Controller
 
     /**
      * Sumber secret:
-     * - DB table `pr_table_qr_secret` row id=1 (pengaturan dari admin finance)
+     * - DB table `pos_self_order_qr_secret` row id=1 (pengaturan dari admin finance)
+     * - fallback legacy `pr_table_qr_secret`
      * - ENV `TABLE_QR_SECRET` sebagai fallback legacy
      *
      * Return: ['secret' => string, 'enforce' => 0/1] atau null kalau belum ada.
      */
     private function qr_secret_info()
     {
-        if ($this->db->table_exists('pr_table_qr_secret')) {
-            $row = $this->db->get_where('pr_table_qr_secret', ['id' => 1])->row_array();
+        $table = null;
+        if ($this->db->table_exists('pos_self_order_qr_secret')) {
+            $table = 'pos_self_order_qr_secret';
+        } elseif ($this->db->table_exists('pr_table_qr_secret')) {
+            $table = 'pr_table_qr_secret';
+        }
+
+        if ($table !== null) {
+            $row = $this->db->get_where($table, ['id' => 1])->row_array();
             $dbSecret = trim((string) ($row['secret'] ?? ''));
             if ($dbSecret !== '') {
                 return [
@@ -65,7 +73,14 @@ class Meja extends CI_Controller
             return;
         }
 
-        if (!$this->db->table_exists('pr_meja')) {
+        $tableName = null;
+        if ($this->db->table_exists('pos_self_order_table')) {
+            $tableName = 'pos_self_order_table';
+        } elseif ($this->db->table_exists('pr_meja')) {
+            $tableName = 'pr_meja';
+        }
+
+        if ($tableName === null) {
             show_error('Fitur QR meja belum tersedia pada schema db_finance saat ini.', 503);
             return;
         }
@@ -95,7 +110,7 @@ class Meja extends CI_Controller
             }
         }
 
-        $meja = $this->db->get_where('pr_meja', ['id' => $meja_id])->row_array();
+        $meja = $this->db->get_where($tableName, ['id' => $meja_id])->row_array();
         if (!$meja) {
             show_error('Meja tidak ditemukan.', 404);
             return;
