@@ -365,13 +365,16 @@ class Order extends CI_Controller
             return [];
         }
 
-        return $this->db
+        $this->db
             ->select('e.id, e.extra_name as nama_extra, e.selling_price as harga', false)
             ->from('mst_extra e')
-            ->where('e.is_active', 1)
-            ->order_by('e.extra_name', 'ASC')
-            ->get()
-            ->result_array();
+            ->where('e.is_active', 1);
+
+        if ($this->db->field_exists('show_in_self_order', 'mst_extra')) {
+            $this->db->where('e.show_in_self_order', 1);
+        }
+
+        return $this->db->order_by('e.extra_name', 'ASC')->get()->result_array();
     }
 
     private function normalize_cart($cart)
@@ -417,6 +420,11 @@ class Order extends CI_Controller
             return ['produk_id' => $produk_id, 'groups' => []];
         }
 
+        $extra_join = 'e.id = gi.extra_id AND e.is_active = 1';
+        if ($this->db->field_exists('show_in_self_order', 'mst_extra')) {
+            $extra_join .= ' AND e.show_in_self_order = 1';
+        }
+
         $rows = $this->db
             ->select('
                 m.sort_order as map_sort_order,
@@ -435,7 +443,7 @@ class Order extends CI_Controller
             ->from('mst_product_extra_map m')
             ->join('mst_extra_group g', 'g.id = m.extra_group_id AND g.is_active = 1', 'inner')
             ->join('mst_extra_group_item gi', 'gi.extra_group_id = g.id', 'inner')
-            ->join('mst_extra e', 'e.id = gi.extra_id AND e.is_active = 1', 'inner')
+            ->join('mst_extra e', $extra_join, 'inner')
             ->where('m.product_id', $produk_id)
             ->order_by('m.sort_order', 'ASC')
             ->order_by('g.sort_order', 'ASC')

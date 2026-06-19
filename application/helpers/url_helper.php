@@ -28,6 +28,38 @@ if (!function_exists('dashboard_url')) {
     }
 }
 
+/**
+ * Product Photo URL
+ *
+ * photo_path di DB menyimpan full relative path, mis: uploads/produk/abc.jpg
+ * Dev (localhost): gunakan URL finance lokal
+ * Prod: gunakan https://core.namuacoffee.com/
+ */
+if (!function_exists('product_url')) {
+    function product_url($path = '')
+    {
+        $path = is_string($path) ? ltrim((string) $path, '/') : '';
+        if (!$path) return '';
+        // Sudah absolute URL, kembalikan apa adanya
+        if (preg_match('/^https?:\/\//', $path)) return $path;
+
+        $host = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : '';
+        $is_local = (
+            strpos($host, 'localhost') !== false
+            || strpos($host, '127.0.0.1') !== false
+            || strpos($host, '::1') !== false
+        );
+
+        if ($is_local) {
+            // Finance app berjalan di /finance/ di server yang sama
+            $finance_base = rtrim(str_replace('/member/', '/finance/', rtrim(base_url(), '/')), '/');
+            return $finance_base . '/' . $path;
+        }
+
+        return 'https://core.namuacoffee.com/' . $path;
+    }
+}
+
 
 /**
  * Base URL

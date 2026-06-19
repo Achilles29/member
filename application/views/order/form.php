@@ -96,7 +96,7 @@
                 <?php if (!empty($p->foto)): ?>
                 <img
                   loading="lazy"
-                  src="https://core.namuacoffee.com/uploads/produk/<?= html_escape($p->foto) ?>"
+                  src="<?= product_url($p->foto) ?>"
                   alt="<?= html_escape($p->nama_produk) ?>"
                   onerror="this.onerror=null;this.style.display='none';"
                 >
