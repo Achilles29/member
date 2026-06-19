@@ -2084,19 +2084,27 @@ body{
   margin:0;
 }
 
-/* Category tab strip — sticky below search */
-.nm-order__tabs{
+/* Sticky wrapper — holds scrollable tabs + always-visible ≡ button */
+.nm-order__tabbar{
+  position:sticky;
+  top:64px;
+  z-index:61;
+  background:var(--bg);
   margin:0 -14px;
+  display:flex;
+  align-items:center;
+  box-shadow:0 3px 14px rgba(0,0,0,.07);
+}
+
+/* Category tab strip — scrollable, fills tabbar */
+.nm-order__tabs{
+  flex:1;
+  min-width:0;
   padding:10px 14px;
   display:flex;
   gap:8px;
   overflow-x:auto;
   scroll-snap-type:x mandatory;
-  position:sticky;
-  top:64px;   /* height of sticky search bar */
-  z-index:61;
-  background:var(--bg);
-  box-shadow:0 3px 14px rgba(0,0,0,.07);
 }
 .nm-order__tabs::-webkit-scrollbar{ display:none; }
 
@@ -2125,26 +2133,24 @@ body{
   box-shadow:0 8px 18px rgba(139,28,28,.25);
 }
 
-/* "More categories" button at end of tab strip */
+/* "More categories" button — always visible at right of tabbar */
 .nm-order__tab-more{
-  flex:0 0 auto;
-  border:1.5px solid #e5e7eb;
-  background:#fff;
+  flex-shrink:0;
+  border:none;
+  border-left:1.5px solid #e5e7eb;
+  background:transparent;
   color:#6b7280;
-  width:38px;
-  height:38px;
-  border-radius:50%;
+  width:46px;
+  height:100%;
+  min-height:58px;
   display:flex;
   align-items:center;
   justify-content:center;
-  box-shadow:0 4px 10px rgba(0,0,0,.05);
   cursor:pointer;
   padding:0;
-  margin-left:4px;
-  flex-shrink:0;
 }
 .nm-order__tab-more i{ font-size:18px; }
-.nm-order__tab-more:active{ transform:scale(.93); }
+.nm-order__tab-more:active{ background:rgba(0,0,0,.04); }
 
 /* Product card — override padding for full-bleed image */
 .nm-order .nm-order__item{
@@ -2232,4 +2238,267 @@ body{
 }
 
 /* Section head spacing tweak for order page */
-.nm-order .nm-order__section{ margin-top:12px; scroll-margin-top:100px; }
+.nm-order .nm-order__section{ margin-top:12px; scroll-margin-top:130px; }
+
+/* ══════════════════════════════════════════════════════════
+   ORDER PAGE — PREMIUM VISUAL UPGRADE v2
+══════════════════════════════════════════════════════════ */
+
+/* ── Per-category color tokens (cascade to all children) ── */
+.nm-order__section{
+  --kat-h:calc(var(--kat-idx,0) * 47);
+  --kat-color:hsl(var(--kat-h),58%,40%);
+  --kat-soft:hsl(var(--kat-h),58%,95%);
+  --kat-border:hsl(var(--kat-h),58%,84%);
+}
+
+/* ── Section / category divider ── */
+.nm-order__kat-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:22px 0 12px;
+  margin-bottom:14px;
+  border-bottom:2.5px solid var(--kat-border);
+  position:relative;
+}
+/* Left accent stripe that bleeds into page margin */
+.nm-order__kat-head::before{
+  content:'';
+  position:absolute;
+  left:-14px;
+  top:24px;
+  width:4px;
+  height:28px;
+  background:var(--kat-color);
+  border-radius:0 4px 4px 0;
+}
+.nm-order__kat-label{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+.nm-order__kat-dot{
+  width:10px;
+  height:10px;
+  border-radius:50%;
+  background:var(--kat-color);
+  box-shadow:0 0 0 4px var(--kat-soft);
+  flex-shrink:0;
+}
+.nm-order__kat-name{
+  font-size:15px;
+  font-weight:1000;
+  color:var(--text);
+  letter-spacing:-.2px;
+}
+.nm-order__kat-badge{
+  font-size:11px;
+  font-weight:800;
+  color:var(--kat-color);
+  background:var(--kat-soft);
+  border:1.5px solid var(--kat-border);
+  padding:4px 10px;
+  border-radius:999px;
+  white-space:nowrap;
+}
+
+/* ── Tab strip right-fade — hints more tabs are hidden ── */
+.nm-order__tabbar{ position:relative; }
+.nm-order__tabbar::before{
+  content:'';
+  position:absolute;
+  right:46px;
+  top:0;
+  bottom:0;
+  width:38px;
+  background:linear-gradient(to right,transparent,var(--bg));
+  pointer-events:none;
+  z-index:5;
+}
+
+/* ── Shimmer loading animation for product photo placeholder ── */
+@keyframes nm-shimmer{
+  0%  { background-position:-200% center; }
+  100%{ background-position: 200% center; }
+}
+.nm-order .nm-order__imgWrap{
+  background:linear-gradient(90deg,#ede8e4 25%,#d9d0c8 50%,#ede8e4 75%);
+  background-size:200% 100%;
+  animation:nm-shimmer 1.8s ease-in-out infinite;
+}
+/* image sits above shimmer; once loaded it covers the animation */
+.nm-order .nm-order__imgWrap img{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  z-index:1;
+  transition:opacity .3s ease;
+}
+
+/* ── Fab (+) button adopts category color automatically ── */
+.nm-order__fab{
+  background:linear-gradient(135deg,var(--kat-color,var(--primary)),hsl(var(--kat-h,0),58%,54%));
+  box-shadow:0 6px 16px hsla(var(--kat-h,0),58%,40%,.40);
+  width:36px;
+  height:36px;
+}
+.nm-order__fab i{ font-size:17px; }
+
+/* ── Cart bar gradient polish ── */
+.nm-cartbar__btn{
+  background:linear-gradient(135deg,var(--primary) 0%,#b92b2b 100%);
+  border-radius:18px;
+}
+
+/* ── Category sheet backdrop with blur ── */
+.nm-sheet--cat .nm-sheet__backdrop{
+  background:rgba(15,20,32,.55);
+  backdrop-filter:blur(5px);
+  -webkit-backdrop-filter:blur(5px);
+}
+
+/* ── Category sheet panel — reset padding for full-bleed hero ── */
+.nm-sheet--cat .nm-sheet__panel{
+  padding:0;
+  border-radius:22px 22px 0 0;
+  overflow:hidden;
+  max-height:72vh;
+  display:flex;
+  flex-direction:column;
+}
+
+/* ── Category sheet hero header ── */
+.nm-catsheet__hero{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:16px 16px 16px;
+  background:linear-gradient(135deg,#8b1c1c 0%,#c0392b 60%,#e74c3c 100%);
+  color:#fff;
+  flex-shrink:0;
+}
+.nm-catsheet__hero-left{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+.nm-catsheet__hero-icon{
+  font-size:34px;
+  line-height:1;
+  filter:drop-shadow(0 2px 8px rgba(0,0,0,.25));
+}
+.nm-catsheet__hero-title{
+  font-size:16px;
+  font-weight:1000;
+  letter-spacing:-.2px;
+}
+.nm-catsheet__hero-sub{
+  font-size:11px;
+  opacity:.82;
+  margin-top:3px;
+}
+.nm-catsheet__close{
+  width:36px;
+  height:36px;
+  border-radius:50%;
+  background:rgba(255,255,255,.18);
+  border:1.5px solid rgba(255,255,255,.28);
+  color:#fff;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  flex-shrink:0;
+  transition:background .12s ease, transform .1s ease;
+}
+.nm-catsheet__close i{ font-size:16px; }
+.nm-catsheet__close:active{
+  background:rgba(255,255,255,.36);
+  transform:scale(.93);
+}
+
+/* ── Category sheet content area ── */
+.nm-sheet--cat .nm-sheet__content{
+  padding:8px 12px 16px;
+  overflow-y:auto;
+  flex:1;
+  min-height:0;
+  display:block;
+}
+
+/* ── Category list items — new layout ── */
+.nm-catlist{ gap:4px; padding:0; }
+
+.nm-catitem{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:11px 10px;
+  border-radius:14px;
+  background:transparent;
+  border:none;
+  color:#111827;
+  font-weight:1000;
+  font-size:13px;
+  width:100%;
+  cursor:pointer;
+  transition:background .12s ease, transform .1s ease;
+  justify-content:flex-start;
+}
+.nm-catitem:active{
+  background:rgba(139,28,28,.07);
+  transform:scale(.99);
+}
+.nm-catitem--all{
+  background:rgba(139,28,28,.06);
+  border:1.5px solid rgba(139,28,28,.15);
+  margin-bottom:4px;
+}
+.nm-catitem__emoji{
+  font-size:20px;
+  line-height:1;
+  width:42px;
+  height:42px;
+  background:#f4f6f8;
+  border-radius:13px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-shrink:0;
+}
+.nm-catitem--all .nm-catitem__emoji{
+  background:rgba(139,28,28,.10);
+}
+.nm-catitem__name{
+  flex:1;
+  text-align:left;
+  font-size:14px;
+  font-weight:1000;
+  color:var(--text);
+}
+.nm-catitem--all .nm-catitem__name{ color:var(--primary); }
+.nm-catitem__arrow{
+  font-size:13px;
+  color:#c4c9d4;
+  flex-shrink:0;
+}
+
+/* ── Staggered slide-in animation for catlist items ── */
+@keyframes nm-slide-up{
+  from{ opacity:0; transform:translateY(10px); }
+  to  { opacity:1; transform:translateY(0);    }
+}
+#nmCatList .nm-catitem{ animation:nm-slide-up .22s ease backwards; }
+#nmCatList .nm-catitem:nth-child(1){ animation-delay:0ms;   }
+#nmCatList .nm-catitem:nth-child(2){ animation-delay:35ms;  }
+#nmCatList .nm-catitem:nth-child(3){ animation-delay:70ms;  }
+#nmCatList .nm-catitem:nth-child(4){ animation-delay:105ms; }
+#nmCatList .nm-catitem:nth-child(5){ animation-delay:140ms; }
+#nmCatList .nm-catitem:nth-child(6){ animation-delay:175ms; }
+#nmCatList .nm-catitem:nth-child(7){ animation-delay:210ms; }
+#nmCatList .nm-catitem:nth-child(8){ animation-delay:245ms; }
+#nmCatList .nm-catitem:nth-child(9){ animation-delay:280ms; }
+#nmCatList .nm-catitem:nth-child(10){ animation-delay:315ms; }

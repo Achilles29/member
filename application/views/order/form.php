@@ -48,19 +48,21 @@
     </div>
   </div>
 
-  <!-- Category tab strip (scrollable horizontal pills) -->
-  <div class="nm-order__tabs" id="nmCatTabs">
-    <button type="button" class="nm-order__tab is-active" data-kat-id="" data-kat-nama="Semua">
-      Semua
-    </button>
-    <?php foreach (($kategori ?? []) as $kat): ?>
-      <button
-        type="button"
-        class="nm-order__tab"
-        data-kat-id="<?= (int) $kat->id ?>"
-        data-kat-nama="<?= html_escape($kat->nama_kategori) ?>"
-      ><?= html_escape($kat->nama_kategori) ?></button>
-    <?php endforeach; ?>
+  <!-- Category tab strip + dropdown trigger (always visible) -->
+  <div class="nm-order__tabbar">
+    <div class="nm-order__tabs" id="nmCatTabs">
+      <button type="button" class="nm-order__tab is-active" data-kat-id="" data-kat-nama="Semua">
+        Semua
+      </button>
+      <?php foreach (($kategori ?? []) as $kat): ?>
+        <button
+          type="button"
+          class="nm-order__tab"
+          data-kat-id="<?= (int) $kat->id ?>"
+          data-kat-nama="<?= html_escape($kat->nama_kategori) ?>"
+        ><?= html_escape($kat->nama_kategori) ?></button>
+      <?php endforeach; ?>
+    </div>
     <button type="button" class="nm-order__tab-more" id="nmOpenCategories" aria-label="Semua kategori">
       <i class="f7-icons">line_horizontal_3</i>
     </button>
@@ -69,12 +71,14 @@
   <!-- Product sections -->
   <div id="nmProduk">
     <?php foreach (($kategori ?? []) as $idx => $kat): ?>
-      <div class="nm-order__section" data-kat-id="<?= (int) $kat->id ?>">
-        <div class="nm-section-head">
-          <div>
-            <div class="nm-section-title"><?= html_escape($kat->nama_kategori) ?></div>
-            <div class="nm-section-sub">Tap menu untuk tambah ke keranjang</div>
+      <?php $jumlah_menu = count($produk_per_kategori[$kat->id] ?? []); ?>
+      <div class="nm-order__section" data-kat-id="<?= (int) $kat->id ?>" style="--kat-idx:<?= (int) $idx ?>">
+        <div class="nm-order__kat-head">
+          <div class="nm-order__kat-label">
+            <span class="nm-order__kat-dot"></span>
+            <span class="nm-order__kat-name nm-kat-emoji-target" data-kat-name="<?= strtolower(html_escape($kat->nama_kategori)) ?>"><?= html_escape($kat->nama_kategori) ?></span>
           </div>
+          <span class="nm-order__kat-badge"><?= $jumlah_menu ?> menu</span>
         </div>
 
         <div class="nm-order__grid">
@@ -207,28 +211,40 @@
     </div>
   </div>
 
-  <!-- Category sheet (kept for compatibility — tabs are primary nav) -->
+  <!-- Category sheet -->
   <div class="nm-sheet nm-sheet--cat" id="nmCatSheet" hidden>
     <div class="nm-sheet__backdrop" id="nmCatBackdrop"></div>
     <div class="nm-sheet__panel" id="nmCatPanel" role="dialog" aria-modal="true" aria-label="Kategori">
-      <div class="nm-sheet__handle"></div>
-      <div class="nm-sheet__head">
-        <div class="nm-sheet__title">Kategori</div>
-        <button type="button" class="nm-iconbtn" id="nmCloseCat" aria-label="Tutup">
+      <div class="nm-catsheet__hero">
+        <div class="nm-catsheet__hero-left">
+          <div class="nm-catsheet__hero-icon">☕</div>
+          <div>
+            <div class="nm-catsheet__hero-title">Semua Kategori</div>
+            <div class="nm-catsheet__hero-sub"><?= count($kategori ?? []) ?> kategori tersedia</div>
+          </div>
+        </div>
+        <button type="button" class="nm-catsheet__close" id="nmCloseCat" aria-label="Tutup">
           <i class="f7-icons">xmark</i>
         </button>
       </div>
       <div class="nm-sheet__content">
         <div class="nm-catlist" id="nmCatList">
-          <?php foreach (($kategori ?? []) as $kat): ?>
+          <button type="button" class="nm-catitem nm-catitem--all" data-kat-id="" data-kat-nama="Semua">
+            <span class="nm-catitem__emoji">🍃</span>
+            <span class="nm-catitem__name">Semua Menu</span>
+            <i class="f7-icons nm-catitem__arrow" aria-hidden="true">chevron_right</i>
+          </button>
+          <?php foreach (($kategori ?? []) as $idx => $kat): ?>
             <button
               type="button"
               class="nm-catitem"
               data-kat-id="<?= (int) $kat->id ?>"
               data-kat-nama="<?= html_escape($kat->nama_kategori) ?>"
+              style="--kat-idx:<?= (int) $idx ?>"
             >
-              <?= html_escape($kat->nama_kategori) ?>
-              <i class="f7-icons" aria-hidden="true">chevron_right</i>
+              <span class="nm-catitem__emoji nm-kat-emoji-target" data-kat-name="<?= strtolower(html_escape($kat->nama_kategori)) ?>"></span>
+              <span class="nm-catitem__name"><?= html_escape($kat->nama_kategori) ?></span>
+              <i class="f7-icons nm-catitem__arrow" aria-hidden="true">chevron_right</i>
             </button>
           <?php endforeach; ?>
         </div>
@@ -871,5 +887,38 @@
       await saveServer('review');
       window.location.href = BASE_URL + 'order/review_session';
     });
+
+    // ── Category emoji auto-assignment ────────────────────────────────────────
+    (function assignCatEmojis() {
+      const map = [
+        [['masterpiece', 'signature', 'premium', 'special'], '⭐'],
+        [['classic', 'original', 'americano', 'espresso'], '☕'],
+        [['coldbrew', 'cold brew', 'cold'], '🧊'],
+        [['susu', 'milk', 'latte', 'lattee'], '🥛'],
+        [['tea', 'teh', 'artisan'], '🍵'],
+        [['mocktail', 'cocktail'], '🍹'],
+        [['refreshing', 'refresh', 'soda', 'juice', 'jus'], '🥤'],
+        [['food', 'makanan', 'snack', 'pasta', 'rice', 'nasi'], '🥐'],
+        [['cake', 'dessert', 'kue', 'sweet'], '🍰'],
+        [['rtd', 'ready to drink', 'bottle', 'botol'], '📦'],
+        [['series', 'collection'], '✨'],
+        [['kopi'], '☕'],
+      ];
+      document.querySelectorAll('.nm-kat-emoji-target').forEach((el) => {
+        const name = (el.getAttribute('data-kat-name') || '').toLowerCase();
+        let emoji = '🍃';
+        for (const [keys, icon] of map) {
+          if (keys.some((k) => name.includes(k))) { emoji = icon; break; }
+        }
+        // For section headers: prepend emoji before the text node
+        if (el.classList.contains('nm-order__kat-name')) {
+          el.textContent = emoji + ' ' + el.textContent;
+        } else {
+          // For catitem spans
+          el.textContent = emoji;
+        }
+      });
+    })();
+
   })();
 </script>
