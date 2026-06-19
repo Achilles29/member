@@ -100,20 +100,24 @@ class Member_model extends CI_Model
 
     public function get_active_poin($id)
     {
+        // Legacy balance: saldo poin sebelum migrasi (point_balance_cache di crm_member)
         $member = $this->db->select('point_balance_cache')->get_where($this->table, ['id' => $id])->row_array();
-        if ($member && isset($member['point_balance_cache'])) {
-            return (int) round((float) $member['point_balance_cache']);
-        }
+        $legacy = ($member && isset($member['point_balance_cache']))
+            ? (float) $member['point_balance_cache']
+            : 0;
 
+        // New balance: running total dari pos_point_ledger (transaksi setelah migrasi)
         $result = $this->db
             ->select('balance_after')
             ->where('member_id', $id)
             ->order_by('created_at', 'DESC')
+            ->order_by('id', 'DESC')
             ->limit(1)
             ->get($this->table_poin)
             ->row();
+        $new = (float) ($result->balance_after ?? 0);
 
-        return (int) round((float) ($result->balance_after ?? 0));
+        return (int) round($legacy + $new);
     }
 
     public function get_level($poin)

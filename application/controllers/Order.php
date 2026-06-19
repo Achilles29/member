@@ -366,11 +366,10 @@ class Order extends CI_Controller
         }
 
         return $this->db
-            ->select('id, extra_name as nama_extra, selling_price as harga', false)
-            ->from('mst_extra')
-            ->where('is_active', 1)
-            ->where('show_in_self_order', 1)
-            ->order_by('id', 'ASC')
+            ->select('e.id, e.extra_name as nama_extra, e.selling_price as harga', false)
+            ->from('mst_extra e')
+            ->where('e.is_active', 1)
+            ->order_by('e.extra_name', 'ASC')
             ->get()
             ->result_array();
     }
@@ -399,100 +398,81 @@ class Order extends CI_Controller
     }
 
     /**
-     * Ambil opsi extra per-produk dengan skema group (selaras kasir/get_extra_options_produk).
+     * Ambil opsi extra per-produk — selaras dengan logika POS (Pos_model::load_product_extra_group_map).
+     * Tabel: mst_product_extra_map → mst_extra_group → mst_extra_group_item → mst_extra
      */
     private function fetch_extra_groups_for_produk($produk_id)
     {
         $produk_id = (int) $produk_id;
         if ($produk_id <= 0) {
-            return ['produk_id' => 0, 'divisi_id' => 0, 'groups' => []];
+            return ['produk_id' => 0, 'groups' => []];
         }
 
         if (
-            !$this->db->table_exists('mst_extra_group')
+            !$this->db->table_exists('mst_product_extra_map')
+            || !$this->db->table_exists('mst_extra_group')
             || !$this->db->table_exists('mst_extra_group_item')
-            || !$this->db->table_exists('mst_product_extra_group_map')
+            || !$this->db->table_exists('mst_extra')
         ) {
-            return ['produk_id' => $produk_id, 'divisi_id' => 0, 'groups' => []];
+            return ['produk_id' => $produk_id, 'groups' => []];
         }
 
-        $divisi_id = (int) $this->db
-            ->select('k.product_division_id')
-            ->from('mst_product p')
-            ->join('mst_product_category k', 'k.id = p.product_category_id', 'left')
-            ->where('p.id', $produk_id)
-            ->get()
-            ->row('product_division_id');
-
-        $groups = $this->db
-            ->select('g.id, g.group_name as nama_group, g.is_required as is_wajib, g.min_select as min_pilih, g.max_select as max_pilih, m.sort_order as urutan')
-            ->from('mst_product_extra_group_map m')
-            ->join('mst_extra_group g', 'g.id = m.extra_group_id', 'left')
+        $rows = $this->db
+            ->select('
+                m.sort_order as map_sort_order,
+                g.id AS group_id,
+                g.group_name,
+                g.is_required,
+                g.min_select,
+                g.max_select,
+                gi.sort_order AS item_sort_order,
+                e.id AS extra_id,
+                e.extra_name,
+                e.extra_type,
+                e.selling_price,
+                e.cost_amount
+            ', false)
+            ->from('mst_product_extra_map m')
+            ->join('mst_extra_group g', 'g.id = m.extra_group_id AND g.is_active = 1', 'inner')
+            ->join('mst_extra_group_item gi', 'gi.extra_group_id = g.id', 'inner')
+            ->join('mst_extra e', 'e.id = gi.extra_id AND e.is_active = 1', 'inner')
             ->where('m.product_id', $produk_id)
-            ->where('g.is_active', 1)
             ->order_by('m.sort_order', 'ASC')
             ->order_by('g.sort_order', 'ASC')
+            ->order_by('gi.sort_order', 'ASC')
             ->get()
             ->result_array();
 
-        if (empty($groups)) {
-            return ['produk_id' => $produk_id, 'divisi_id' => $divisi_id, 'groups' => []];
-        }
+        $groups_map = [];
+        foreach ($rows as $row) {
+            $gid = (int) $row['group_id'];
+            if (!isset($groups_map[$gid])) {
+                $is_required = (int) ($row['is_required'] ?? 0);
+                $min = (int) ($row['min_select'] ?? 0);
+                $max = (int) ($row['max_select'] ?? 1);
+                if ($is_required === 1 && $min <= 0) $min = 1;
+                if ($is_required === 0) $min = 0;
+                if ($max <= 0) $max = 1;
 
-        $group_ids = array_map(static function ($g) {
-            return (int) $g['id'];
-        }, $groups);
-
-        $this->db
-            ->select('gi.extra_group_id as pr_extra_group_id, e.id, e.extra_code as sku, e.extra_name as nama_extra, e.uom_name as satuan, e.selling_price as harga, e.cost_amount as hpp, e.extra_type as tipe_extra')
-            ->from('mst_extra_group_item gi')
-            ->join('mst_extra e', 'e.id = gi.extra_id', 'left')
-            ->where_in('gi.extra_group_id', $group_ids)
-            ->where('e.is_active', 1)
-            ->where('e.show_in_self_order', 1)
-            ->order_by('gi.sort_order', 'ASC')
-            ->order_by('e.extra_name', 'ASC');
-        $items = $this->db->get()->result_array();
-
-        $items_by_group = [];
-        foreach ($items as $it) {
-            $gid = (int) ($it['pr_extra_group_id'] ?? 0);
-            if ($gid <= 0) continue;
-            if (!isset($items_by_group[$gid])) {
-                $items_by_group[$gid] = [];
+                $groups_map[$gid] = [
+                    'id'         => $gid,
+                    'nama_group' => (string) ($row['group_name'] ?? ''),
+                    'is_wajib'   => $is_required,
+                    'min_pilih'  => $min,
+                    'max_pilih'  => $max,
+                    'items'      => [],
+                ];
             }
-            $items_by_group[$gid][] = [
-                'id' => (int) ($it['id'] ?? 0),
-                'sku' => $it['sku'] ?? '',
-                'nama_extra' => $it['nama_extra'] ?? '',
-                'satuan' => $it['satuan'] ?? '',
-                'harga' => (float) ($it['harga'] ?? 0),
-                'hpp' => (float) ($it['hpp'] ?? 0),
-                'tipe_extra' => $it['tipe_extra'] ?? 'ADD',
+            $groups_map[$gid]['items'][] = [
+                'id'         => (int) ($row['extra_id'] ?? 0),
+                'nama_extra' => (string) ($row['extra_name'] ?? ''),
+                'harga'      => (float) ($row['selling_price'] ?? 0),
+                'hpp'        => (float) ($row['cost_amount'] ?? 0),
+                'tipe_extra' => (string) ($row['extra_type'] ?? 'ADD'),
             ];
         }
 
-        foreach ($groups as &$g) {
-            $gid = (int) ($g['id'] ?? 0);
-            $g['id'] = $gid;
-            $g['is_wajib'] = (int) ($g['is_wajib'] ?? 0);
-            $g['min_pilih'] = (int) ($g['min_pilih'] ?? 0);
-            $g['max_pilih'] = (int) ($g['max_pilih'] ?? 1);
-            if ($g['is_wajib'] === 1 && $g['min_pilih'] <= 0) {
-                $g['min_pilih'] = 1;
-            }
-            if ($g['is_wajib'] === 0 && $g['min_pilih'] > 0) {
-                $g['min_pilih'] = 0;
-            }
-            if ($g['max_pilih'] <= 0) {
-                $g['max_pilih'] = 1;
-            }
-            $g['items'] = $items_by_group[$gid] ?? [];
-            unset($g['urutan']);
-        }
-        unset($g);
-
-        return ['produk_id' => $produk_id, 'divisi_id' => $divisi_id, 'groups' => $groups];
+        return ['produk_id' => $produk_id, 'groups' => array_values($groups_map)];
     }
 
     public function get_extra_options_produk()

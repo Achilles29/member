@@ -1,50 +1,72 @@
 <?php
-// Framework7-based order UI (senada dengan halaman member lain).
+// Framework7-based order UI — redesigned premium look.
 // Cart disimpan ke session (AJAX: order/save_cart) + localStorage (anti hilang kalau tab ditutup).
 ?>
 
 <div class="page-content nm-page nm-order">
-  <div class="nm-topbar nm-topbar--mini">
-    <div>
-      <div class="nm-name">Order</div>
-      <div class="nm-level">
+
+  <!-- ── ORDER HERO ─────────────────────────── -->
+  <div class="nm-order-hero">
+    <div class="nm-order-hero__top">
+      <div>
+        <div class="nm-order-hero__title">☕ Menu</div>
+        <div class="nm-order-hero__sub">
+          <?php if (!empty($nomor_meja)): ?>
+            Meja <?= html_escape($nomor_meja) ?> — yuk pilih favoritmu!
+          <?php else: ?>
+            Pilih menu favoritmu
+          <?php endif; ?>
+        </div>
+      </div>
+      <div class="nm-order-hero__right">
         <?php if (!empty($nomor_meja)): ?>
-          Meja <?= html_escape($nomor_meja) ?>
-        <?php else: ?>
-          Scan QR meja dulu ya
+          <div class="nm-order-hero__meja">
+            <i class="f7-icons" aria-hidden="true">table_furniture</i>
+            Meja <?= html_escape($nomor_meja) ?>
+          </div>
         <?php endif; ?>
+        <a class="nm-logout" href="<?= site_url('member/logout') ?>" title="Logout">
+          <i class="f7-icons">rectangle_porous_arrow_right</i>
+        </a>
       </div>
     </div>
-    <a class="nm-logout" href="<?= site_url('member/logout') ?>" title="Logout">
-      <i class="f7-icons">rectangle_porous_arrow_right</i>
-    </a>
   </div>
 
   <?php if (!empty($this->session->flashdata('error'))): ?>
-    <div class="nm-card" style="margin-top:-22px;">
+    <div class="nm-card" style="margin-top:8px;">
       <div class="nm-alert nm-alert--danger">
         <?= html_escape((string) $this->session->flashdata('error')) ?>
       </div>
     </div>
   <?php endif; ?>
 
-  <div class="nm-card nm-order__search" style="margin-top:-22px;">
+  <!-- Search bar (sticky below hero) -->
+  <div class="nm-card nm-order__search">
     <div class="nm-order__searchRow">
       <i class="f7-icons" aria-hidden="true">search</i>
       <input id="nmSearch" type="search" placeholder="Cari menu..." autocomplete="off">
     </div>
   </div>
 
-  <div class="nm-card nm-order__category" style="margin-top:10px;">
-    <button type="button" class="nm-catbtn" id="nmOpenCategories" aria-label="Pilih kategori">
-      <div>
-        <div class="nm-catbtn__label">Kategori</div>
-        <div class="nm-catbtn__value" id="nmActiveCategory">Semua</div>
-      </div>
-      <i class="f7-icons" aria-hidden="true">chevron_down</i>
+  <!-- Category tab strip (scrollable horizontal pills) -->
+  <div class="nm-order__tabs" id="nmCatTabs">
+    <button type="button" class="nm-order__tab is-active" data-kat-id="" data-kat-nama="Semua">
+      Semua
+    </button>
+    <?php foreach (($kategori ?? []) as $kat): ?>
+      <button
+        type="button"
+        class="nm-order__tab"
+        data-kat-id="<?= (int) $kat->id ?>"
+        data-kat-nama="<?= html_escape($kat->nama_kategori) ?>"
+      ><?= html_escape($kat->nama_kategori) ?></button>
+    <?php endforeach; ?>
+    <button type="button" class="nm-order__tab-more" id="nmOpenCategories" aria-label="Semua kategori">
+      <i class="f7-icons">line_horizontal_3</i>
     </button>
   </div>
 
+  <!-- Product sections -->
   <div id="nmProduk">
     <?php foreach (($kategori ?? []) as $idx => $kat): ?>
       <div class="nm-order__section" data-kat-id="<?= (int) $kat->id ?>">
@@ -58,12 +80,8 @@
         <div class="nm-order__grid">
           <?php foreach (($produk_per_kategori[$kat->id] ?? []) as $p): ?>
             <?php
-              // Samakan dengan dashboard/beranda:
-              // - stok <= 0 => HABIS
-              // - stok <= 10 => KRITIS
               $stok_tersedia = (float) ($p->stok_tersedia ?? 0);
               $is_habis = ($stok_tersedia <= 0);
-              $is_kritis = (!$is_habis && $stok_tersedia <= 10);
             ?>
             <button
               type="button"
@@ -75,34 +93,23 @@
               <?= $is_habis ? 'disabled aria-disabled="true"' : '' ?>
             >
               <div class="nm-order__imgWrap">
+                <?php if (!empty($p->foto)): ?>
                 <img
                   loading="lazy"
-                  src="https://dashboard.namuacoffee.com/uploads/produk/<?= html_escape((string) ($p->foto ?? '')) ?>"
+                  src="https://core.namuacoffee.com/uploads/produk/<?= html_escape($p->foto) ?>"
                   alt="<?= html_escape($p->nama_produk) ?>"
+                  onerror="this.onerror=null;this.style.display='none';"
                 >
+                <?php endif; ?>
                 <?php if ($is_habis): ?>
                   <div class="nm-order__badge nm-order__badge--habis">HABIS</div>
-                <?php elseif ($is_kritis): ?>
-                  <div class="nm-order__badge nm-order__badge--limited">KRITIS</div>
+                <?php else: ?>
+                  <div class="nm-order__fab" aria-hidden="true"><i class="f7-icons">plus</i></div>
                 <?php endif; ?>
               </div>
               <div class="nm-order__meta">
                 <div class="nm-order__name"><?= html_escape($p->nama_produk) ?></div>
                 <div class="nm-order__price">Rp <?= number_format((float) $p->harga_jual, 0, ',', '.') ?></div>
-                <?php if ($is_habis): ?>
-                  <div class="nm-order__stockinfo nm-order__stockinfo--habis">HABIS</div>
-                <?php elseif ($is_kritis): ?>
-                  <div class="nm-order__stockinfo nm-order__stockinfo--limited">KRITIS</div>
-                <?php endif; ?>
-              </div>
-              <div class="nm-order__add">
-                <?php if ($is_habis): ?>
-                  <span>Tidak tersedia</span>
-                  <i class="f7-icons" aria-hidden="true">lock</i>
-                <?php else: ?>
-                  <span>Tambah</span>
-                  <i class="f7-icons" aria-hidden="true">plus</i>
-                <?php endif; ?>
               </div>
             </button>
           <?php endforeach; ?>
@@ -200,7 +207,7 @@
     </div>
   </div>
 
-  <!-- Category sheet -->
+  <!-- Category sheet (kept for compatibility — tabs are primary nav) -->
   <div class="nm-sheet nm-sheet--cat" id="nmCatSheet" hidden>
     <div class="nm-sheet__backdrop" id="nmCatBackdrop"></div>
     <div class="nm-sheet__panel" id="nmCatPanel" role="dialog" aria-modal="true" aria-label="Kategori">
@@ -272,11 +279,11 @@
     const elToggleExtrasText = document.getElementById('nmToggleExtrasText');
     const elExtrasList = document.getElementById('nmExtrasList');
 
-    const elActiveCategory = document.getElementById('nmActiveCategory');
     const elCatSheet = document.getElementById('nmCatSheet');
     const elCatBackdrop = document.getElementById('nmCatBackdrop');
     const elCatPanel = document.getElementById('nmCatPanel');
     const elCatList = document.getElementById('nmCatList');
+    const elCatTabs = document.getElementById('nmCatTabs');
 
     const currency = (n) => 'Rp ' + (Number(n || 0)).toLocaleString('id-ID');
     const extraLookupMap = {};
@@ -402,12 +409,12 @@
       elSheetTotal.textContent = currency(total);
     };
 
-	    const renderCartSheet = () => {
-	      if (Object.keys(cart).length === 0) {
-	        elCartList.innerHTML = '<div class="nm-empty">Keranjang masih kosong.</div>';
-	        renderCartBar();
-	        return;
-	      }
+    const renderCartSheet = () => {
+      if (Object.keys(cart).length === 0) {
+        elCartList.innerHTML = '<div class="nm-empty">Keranjang masih kosong.</div>';
+        renderCartBar();
+        return;
+      }
 
       const rows = Object.entries(cart).map(([k, row]) => {
         const meta = getProdukMeta(row.produk_id);
@@ -418,24 +425,24 @@
           return nm ? nm : ('Extra #' + String(exId));
         });
         const extraLabel = extras.length ? ('<div class="nm-cartitem__extras">+' + extras.map((x) => escapeHtml(x)).join(', ') + '</div>') : '';
-	        return (
-	          '<div class="nm-cartitem">' +
-	            '<div class="nm-cartitem__main">' +
-	              '<div class="nm-cartitem__name">' + escapeHtml(meta.nama) + '</div>' +
-	              extraLabel +
-	              '<div class="nm-cartitem__price">' + currency(meta.harga) + '</div>' +
-	            '</div>' +
-	            '<div class="nm-cartitem__ctrl">' +
-	              '<div class="nm-cartstep" aria-label="Ubah jumlah">' +
-	                '<button type="button" class="nm-mini" data-act="minus" data-key="' + escapeAttr(k) + '" aria-label="Kurangi">-</button>' +
-	                '<div class="nm-cartitem__qty" aria-label="Jumlah">' + String(row.jumlah) + '</div>' +
-	                '<button type="button" class="nm-mini" data-act="plus" data-key="' + escapeAttr(k) + '" aria-label="Tambah">+</button>' +
-	              '</div>' +
-	              '<button type="button" class="nm-mini nm-mini--danger nm-cartitem__del" data-act="del" data-key="' + escapeAttr(k) + '">Hapus</button>' +
-	            '</div>' +
-	          '</div>'
-	        );
-	      }).join('');
+        return (
+          '<div class="nm-cartitem">' +
+            '<div class="nm-cartitem__main">' +
+              '<div class="nm-cartitem__name">' + escapeHtml(meta.nama) + '</div>' +
+              extraLabel +
+              '<div class="nm-cartitem__price">' + currency(meta.harga) + '</div>' +
+            '</div>' +
+            '<div class="nm-cartitem__ctrl">' +
+              '<div class="nm-cartstep" aria-label="Ubah jumlah">' +
+                '<button type="button" class="nm-mini" data-act="minus" data-key="' + escapeAttr(k) + '" aria-label="Kurangi">-</button>' +
+                '<div class="nm-cartitem__qty" aria-label="Jumlah">' + String(row.jumlah) + '</div>' +
+                '<button type="button" class="nm-mini" data-act="plus" data-key="' + escapeAttr(k) + '" aria-label="Tambah">+</button>' +
+              '</div>' +
+              '<button type="button" class="nm-mini nm-mini--danger nm-cartitem__del" data-act="del" data-key="' + escapeAttr(k) + '">Hapus</button>' +
+            '</div>' +
+          '</div>'
+        );
+      }).join('');
 
       elCartList.innerHTML = rows;
       renderCartBar();
@@ -509,35 +516,35 @@
     // Render initial
     renderCartBar();
 
-    // Kategori: semua produk tetap tampil (dropdown hanya untuk lompat/scroll).
-    (function initCategoryScrollAndDropdown() {
+    // ── Category tab strip + scroll logic ────────────────────────────────────
+    (function initCategoryAndTabs() {
       const sections = Array.from(document.querySelectorAll('.nm-order__section'));
       if (!sections.length) return;
-
-      const getKatName = (katId) => {
-        if (!katId) return '';
-        const btn = document.querySelector('.nm-catitem[data-kat-id="' + String(katId) + '"]');
-        // Jangan pakai textContent karena icon Framework7 ikut kebaca ("chevron_right").
-        return btn ? String(btn.getAttribute('data-kat-nama') || '').trim() : '';
-      };
-
-      const setActiveCategory = (katId) => {
-        const nm = getKatName(katId);
-        if (elActiveCategory) elActiveCategory.textContent = nm || 'Semua';
-      };
 
       // Scroll container (Framework7 pakai .page-content sebagai scroller).
       const scrollContainer = (elProduk && elProduk.closest('.page-content')) || document.querySelector('.page-content') || document.scrollingElement || document.documentElement;
 
-      // Aktifkan chip berdasarkan posisi scroll.
+      const setActiveTab = (katId) => {
+        if (!elCatTabs) return;
+        const id = katId ? String(katId) : '';
+        elCatTabs.querySelectorAll('.nm-order__tab').forEach((t) => {
+          const isActive = (t.getAttribute('data-kat-id') || '') === id;
+          t.classList.toggle('is-active', isActive);
+          if (isActive) {
+            // Scroll active tab into view (horizontal)
+            t.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+          }
+        });
+      };
+
+      // IntersectionObserver: update active tab saat user scroll.
       if ('IntersectionObserver' in window) {
         const io = new IntersectionObserver((entries) => {
-          // Cari section yang paling "visible" di area atas.
           const visible = entries
             .filter((e) => e.isIntersecting)
             .sort((a, b) => (b.intersectionRatio || 0) - (a.intersectionRatio || 0))[0];
           if (visible && visible.target) {
-            setActiveCategory(visible.target.getAttribute('data-kat-id'));
+            setActiveTab(visible.target.getAttribute('data-kat-id'));
           }
         }, { root: scrollContainer === document.documentElement ? null : scrollContainer, threshold: [0.15, 0.25, 0.35], rootMargin: '-120px 0px -60% 0px' });
 
@@ -555,13 +562,12 @@
         document.body.classList.remove('nm-no-scroll');
       };
 
-      // Dropdown kategori (sheet)
       const elOpenCategories = document.getElementById('nmOpenCategories');
       if (elOpenCategories) elOpenCategories.addEventListener('click', openCatSheet);
       if (document.getElementById('nmCloseCat')) document.getElementById('nmCloseCat').addEventListener('click', closeCatSheet);
       if (elCatBackdrop) elCatBackdrop.addEventListener('click', closeCatSheet);
 
-      // Klik item kategori = scroll ke section
+      // Scroll to section helper
       const scrollToSection = (sec) => {
         if (!sec) return;
         const doScroll = () => {
@@ -575,7 +581,6 @@
             sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
           }
         };
-
         // iOS kadang perlu delay setelah sheet ditutup.
         requestAnimationFrame(() => {
           doScroll();
@@ -583,17 +588,39 @@
         });
       };
 
+      // Category sheet item click (kept for backwards compat)
       if (elCatList) elCatList.addEventListener('click', (e) => {
         const btn = e.target.closest('.nm-catitem');
         if (!btn) return;
         const katId = btn.getAttribute('data-kat-id');
-        setActiveCategory(katId);
+        setActiveTab(katId);
         const sec = document.querySelector('.nm-order__section[data-kat-id="' + String(katId) + '"]');
         closeCatSheet();
         setTimeout(() => scrollToSection(sec), 50);
       });
 
-      // Swipe down to close (biar sheet bisa "ditutup digeser")
+      // ── Tab strip click ───────────────────────────────────────────────────
+      if (elCatTabs) {
+        elCatTabs.addEventListener('click', (e) => {
+          const tab = e.target.closest('.nm-order__tab');
+          if (!tab) return;
+          const katId = tab.getAttribute('data-kat-id');
+          setActiveTab(katId);
+          if (katId) {
+            const sec = document.querySelector('.nm-order__section[data-kat-id="' + String(katId) + '"]');
+            setTimeout(() => scrollToSection(sec), 30);
+          } else {
+            // "Semua" → scroll to top
+            requestAnimationFrame(() => {
+              if (scrollContainer && typeof scrollContainer.scrollTo === 'function') {
+                scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
+              }
+            });
+          }
+        });
+      }
+
+      // Swipe down to close category sheet
       if (elCatPanel) {
         let startY = 0;
         let moved = 0;
@@ -614,9 +641,13 @@
         });
       }
 
-      // Init label awal
-      const first = sections[0] ? sections[0].getAttribute('data-kat-id') : null;
-      if (first) setActiveCategory(first);
+      // Init tab: highlight first category on page
+      const firstKatId = sections[0] ? sections[0].getAttribute('data-kat-id') : null;
+      if (firstKatId) {
+        setActiveTab(firstKatId);
+      } else {
+        setActiveTab('');
+      }
     })();
 
     // Save server on load (best-effort)
@@ -782,24 +813,24 @@
       elQty.value = String(v);
     });
 
-	    document.getElementById('nmAddToCart').addEventListener('click', async () => {
-	      if (!currentProduk || !currentProduk.id) return;
-	      const jumlah = Math.max(1, Math.floor(Number(elQty.value || 1)));
-        const check = validateExtraGroups(currentExtraGroups);
-        if (!check.ok) {
-          alert(check.message || 'Pilihan extra belum sesuai aturan.');
-          return;
-        }
-	      const extraIds = getSelectedExtraIdsFromPopup();
-	      cart[String(currentProduk.id)] = { produk_id: currentProduk.id, jumlah: jumlah, extra_ids: extraIds };
-	      step = 'menu';
-	      saveLocal();
-	      renderCartBar();
-	      await saveServer('menu');
-	      closePopup();
-	      // Jangan langsung buka keranjang setelah tambah item:
-	      // biar user tetap di daftar menu dan bisa pilih item lain.
-	    });
+    document.getElementById('nmAddToCart').addEventListener('click', async () => {
+      if (!currentProduk || !currentProduk.id) return;
+      const jumlah = Math.max(1, Math.floor(Number(elQty.value || 1)));
+      const check = validateExtraGroups(currentExtraGroups);
+      if (!check.ok) {
+        alert(check.message || 'Pilihan extra belum sesuai aturan.');
+        return;
+      }
+      const extraIds = getSelectedExtraIdsFromPopup();
+      cart[String(currentProduk.id)] = { produk_id: currentProduk.id, jumlah: jumlah, extra_ids: extraIds };
+      step = 'menu';
+      saveLocal();
+      renderCartBar();
+      await saveServer('menu');
+      closePopup();
+      // Jangan langsung buka keranjang setelah tambah item:
+      // biar user tetap di daftar menu dan bisa pilih item lain.
+    });
 
     // Sheet open/close
     document.getElementById('nmOpenCart').addEventListener('click', openSheet);

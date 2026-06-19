@@ -1723,3 +1723,513 @@ body{
   color:var(--muted);
   font-weight:900;
 }
+
+/* =========================================================
+   HOME — REDESIGN (member/index.php)
+========================================================= */
+
+/* Extended gradient header for home */
+.nm-topbar.nm-home-topbar{
+  padding:20px 16px 60px;
+  position:relative;
+  overflow:visible;
+}
+.nm-greeting{
+  font-size:12px;
+  opacity:.8;
+  font-weight:700;
+  letter-spacing:.3px;
+}
+
+/* Member Card — floats out of the header */
+.nm-mcard{
+  margin-top:-44px;
+  background:#fff;
+  border-radius:24px;
+  padding:18px 16px;
+  box-shadow:0 20px 48px rgba(0,0,0,.14);
+  display:flex;
+  align-items:center;
+  gap:14px;
+  position:relative;
+  overflow:hidden;
+}
+/* subtle coffee-bean watermark */
+.nm-mcard::before{
+  content:'☕';
+  position:absolute;
+  right:-6px;
+  top:-12px;
+  font-size:72px;
+  opacity:.04;
+  pointer-events:none;
+}
+
+.nm-avatar{
+  width:52px;
+  height:52px;
+  border-radius:18px;
+  background:linear-gradient(135deg,var(--primary),var(--primary2));
+  color:#fff;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:20px;
+  font-weight:1000;
+  flex:0 0 52px;
+  letter-spacing:-.5px;
+}
+
+.nm-mcard__info{
+  flex:1;
+  min-width:0;
+}
+.nm-mcard__name{
+  font-size:15px;
+  font-weight:1000;
+  color:var(--text);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.nm-mcard__no{
+  margin-top:3px;
+  font-size:11px;
+  color:var(--muted);
+  font-weight:900;
+  letter-spacing:.3px;
+}
+
+/* Level badge */
+.nm-level-badge{
+  display:inline-block;
+  margin-top:6px;
+  padding:4px 10px;
+  border-radius:999px;
+  font-size:10px;
+  font-weight:1000;
+  letter-spacing:.4px;
+  text-transform:uppercase;
+}
+.nm-level-badge--silver{ background:#e5e7eb; color:#374151; }
+.nm-level-badge--gold{ background:linear-gradient(135deg,#f59e0b,#d97706); color:#fff; }
+.nm-level-badge--platinum{ background:linear-gradient(135deg,#6366f1,#8b5cf6); color:#fff; }
+.nm-level-badge--diamond{ background:linear-gradient(135deg,#06b6d4,#0ea5e9); color:#fff; }
+
+.nm-mcard__right{
+  text-align:right;
+  flex:0 0 auto;
+}
+.nm-mcard__balance-label{
+  font-size:10px;
+  color:var(--muted);
+  font-weight:900;
+  letter-spacing:.3px;
+}
+.nm-mcard__balance{
+  font-size:28px;
+  font-weight:1000;
+  color:var(--primary);
+  line-height:1;
+  margin-top:2px;
+}
+.nm-mcard__star{
+  font-size:16px;
+  margin-top:2px;
+}
+
+/* Level progress bar */
+.nm-level-progress{
+  margin-top:14px;
+  background:#fff;
+  border-radius:18px;
+  padding:12px 14px;
+  box-shadow:var(--shadow2);
+}
+.nm-level-progress__row{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  font-size:11px;
+  font-weight:900;
+  color:var(--muted);
+  margin-bottom:8px;
+}
+.nm-level-progress__label{
+  font-size:12px;
+  font-weight:1000;
+  color:var(--text);
+}
+.nm-level-progress__bar{
+  height:6px;
+  border-radius:999px;
+  background:#f3f4f6;
+  overflow:hidden;
+}
+.nm-level-progress__fill{
+  height:100%;
+  border-radius:999px;
+  background:linear-gradient(90deg,var(--primary),var(--primary2));
+  transition:width .4s ease;
+  min-width:4px;
+}
+
+/* Action icon color variants */
+.ico--green{ background:rgba(16,185,129,.12) !important; color:#059669 !important; }
+.ico--orange{ background:rgba(249,115,22,.12) !important; color:#ea580c !important; }
+.ico--blue{ background:rgba(59,130,246,.12) !important; color:#2563eb !important; }
+.ico--purple{ background:rgba(139,92,246,.12) !important; color:#7c3aed !important; }
+.ico--teal{ background:rgba(20,184,166,.12) !important; color:#0d9488 !important; }
+
+/* Badge on action button */
+.nm-action{
+  position:relative;
+}
+.nm-action-badge{
+  position:absolute;
+  top:6px;
+  right:6px;
+  min-width:18px;
+  height:18px;
+  background:var(--primary);
+  color:#fff;
+  border-radius:999px;
+  font-size:10px;
+  font-weight:1000;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:0 4px;
+}
+
+/* Stat row (home) */
+.nm-stat-row{
+  display:flex;
+  gap:10px;
+  margin-top:14px;
+}
+.nm-stat-pill{
+  flex:1;
+  background:#fff;
+  border-radius:18px;
+  padding:12px 10px;
+  text-align:center;
+  box-shadow:var(--shadow2);
+  text-decoration:none;
+  color:var(--text);
+}
+.nm-stat-pill__icon{
+  font-size:20px;
+  line-height:1;
+}
+.nm-stat-pill__num{
+  font-size:18px;
+  font-weight:1000;
+  margin-top:4px;
+  color:var(--primary);
+}
+.nm-stat-pill__label{
+  font-size:10px;
+  color:var(--muted);
+  font-weight:900;
+  margin-top:2px;
+}
+
+/* Stamp visual card */
+.nm-stamp-grid{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-top:10px;
+}
+.nm-stamp-dot{
+  width:36px;
+  height:36px;
+  border-radius:12px;
+  background:#f3f4f6;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:20px;
+  transition:transform .2s;
+}
+.nm-stamp-dot.is-filled{
+  background:linear-gradient(135deg,var(--primary),var(--primary2));
+  box-shadow:0 4px 10px rgba(139,28,28,.22);
+}
+.nm-stamp-dot.is-filled::after{
+  content:'☕';
+}
+.nm-stamp-dot:not(.is-filled)::after{
+  content:'○';
+  color:#d1d5db;
+  font-size:16px;
+}
+
+/* Promo card label */
+.nm-promo-label{
+  padding:8px 10px;
+  font-size:12px;
+  font-weight:1000;
+  color:var(--text);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+/* News card improvement */
+.nm-news-card{
+  display:flex;
+  gap:12px;
+  align-items:flex-start;
+  text-decoration:none;
+  color:inherit;
+}
+.nm-news-card__thumb{
+  width:72px;
+  height:72px;
+  border-radius:16px;
+  object-fit:cover;
+  flex:0 0 72px;
+  background:#f3f4f6;
+}
+.nm-news-card__title{
+  font-size:13px;
+  font-weight:1000;
+  color:var(--text);
+  line-height:1.3;
+}
+.nm-news-card__desc{
+  margin-top:4px;
+  font-size:12px;
+  color:var(--muted);
+  line-height:1.4;
+}
+
+/* =========================================================
+   ORDER PAGE — PREMIUM REDESIGN
+========================================================= */
+
+/* Hero gradient header */
+.nm-order-hero{
+  margin:0 -14px;
+  padding:18px 16px 22px;
+  background:linear-gradient(140deg,#8b1c1c 0%,#b12a2a 55%,#c53535 100%);
+  color:#fff;
+  position:relative;
+  overflow:hidden;
+}
+.nm-order-hero::after{
+  content:'☕';
+  position:absolute;
+  right:-8px;
+  top:-18px;
+  font-size:100px;
+  opacity:.05;
+  transform:rotate(15deg);
+  pointer-events:none;
+  line-height:1;
+}
+.nm-order-hero__top{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+}
+.nm-order-hero__title{
+  font-size:20px;
+  font-weight:1000;
+  letter-spacing:.2px;
+}
+.nm-order-hero__sub{
+  margin-top:4px;
+  font-size:12px;
+  opacity:.88;
+  line-height:1.4;
+}
+.nm-order-hero__right{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+  gap:8px;
+  flex:0 0 auto;
+}
+.nm-order-hero__meja{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  background:rgba(255,255,255,.22);
+  border-radius:999px;
+  padding:7px 14px;
+  font-size:11px;
+  font-weight:1000;
+  letter-spacing:.2px;
+  white-space:nowrap;
+}
+.nm-order-hero__meja i{font-size:14px;}
+
+/* Search bar — sticky right below hero, always reachable */
+.nm-order .nm-order__search{
+  position:sticky;
+  top:0;
+  z-index:62;
+  margin:0 -14px;
+  padding:8px 14px;
+  border-radius:0;
+  box-shadow:0 4px 18px rgba(0,0,0,.10);
+  background:#fff;
+  margin-top:0;
+}
+.nm-order .nm-order__search .nm-order__searchRow{
+  margin:0;
+}
+
+/* Category tab strip — sticky below search */
+.nm-order__tabs{
+  margin:0 -14px;
+  padding:10px 14px;
+  display:flex;
+  gap:8px;
+  overflow-x:auto;
+  scroll-snap-type:x mandatory;
+  position:sticky;
+  top:64px;   /* height of sticky search bar */
+  z-index:61;
+  background:var(--bg);
+  box-shadow:0 3px 14px rgba(0,0,0,.07);
+}
+.nm-order__tabs::-webkit-scrollbar{ display:none; }
+
+.nm-order__tab{
+  flex:0 0 auto;
+  scroll-snap-align:start;
+  border:1.5px solid #e5e7eb;
+  background:#fff;
+  color:#374151;
+  padding:9px 16px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:1000;
+  white-space:nowrap;
+  box-shadow:0 4px 10px rgba(0,0,0,.05);
+  cursor:pointer;
+  transition:background .12s ease, border-color .12s ease, color .12s ease, box-shadow .12s ease;
+}
+.nm-order__tab:active{
+  transform:scale(.97);
+}
+.nm-order__tab.is-active{
+  background:linear-gradient(135deg,var(--primary),var(--primary2));
+  border-color:transparent;
+  color:#fff;
+  box-shadow:0 8px 18px rgba(139,28,28,.25);
+}
+
+/* "More categories" button at end of tab strip */
+.nm-order__tab-more{
+  flex:0 0 auto;
+  border:1.5px solid #e5e7eb;
+  background:#fff;
+  color:#6b7280;
+  width:38px;
+  height:38px;
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-shadow:0 4px 10px rgba(0,0,0,.05);
+  cursor:pointer;
+  padding:0;
+  margin-left:4px;
+  flex-shrink:0;
+}
+.nm-order__tab-more i{ font-size:18px; }
+.nm-order__tab-more:active{ transform:scale(.93); }
+
+/* Product card — override padding for full-bleed image */
+.nm-order .nm-order__item{
+  padding:0;
+  overflow:hidden;
+  text-align:left;
+  cursor:pointer;
+  transition:transform .1s ease, box-shadow .1s ease;
+}
+.nm-order .nm-order__item:active:not(:disabled){
+  transform:scale(.97);
+  box-shadow:0 4px 12px rgba(0,0,0,.10);
+}
+.nm-order .nm-order__item.is-disabled{
+  opacity:.55;
+  filter:grayscale(.2);
+  cursor:not-allowed;
+}
+
+/* Image wrapper — taller + full bleed */
+.nm-order .nm-order__imgWrap{
+  height:130px;
+  border-radius:0;
+}
+/* Coffee icon shows when no photo / photo fails */
+.nm-order .nm-order__imgWrap::before{
+  content:'☕';
+  position:absolute;
+  left:50%;
+  top:50%;
+  transform:translate(-50%,-50%);
+  font-size:52px;
+  opacity:.12;
+  pointer-events:none;
+  z-index:0;
+  line-height:1;
+}
+.nm-order .nm-order__imgWrap img{
+  position:relative;
+  z-index:1;
+  transition:transform .2s ease;
+}
+.nm-order .nm-order__item:active:not(:disabled) .nm-order__imgWrap img{
+  transform:scale(1.04);
+}
+
+/* Floating + button on image */
+.nm-order__fab{
+  position:absolute;
+  right:8px;
+  bottom:8px;
+  width:32px;
+  height:32px;
+  border-radius:50%;
+  background:linear-gradient(135deg,var(--primary),var(--primary2));
+  color:#fff;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-shadow:0 6px 16px rgba(139,28,28,.38);
+  pointer-events:none;
+}
+.nm-order__fab i{ font-size:15px; line-height:1; }
+
+/* Meta section (below image) */
+.nm-order .nm-order__meta{
+  padding:10px 10px 12px;
+  min-height:auto;
+}
+.nm-order .nm-order__name{
+  font-size:12px;
+  font-weight:1000;
+  line-height:1.3;
+  color:var(--text);
+  display:-webkit-box;
+  -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
+  overflow:hidden;
+}
+.nm-order .nm-order__price{
+  margin-top:6px;
+  font-size:13px;
+  font-weight:1000;
+  color:var(--primary);
+}
+
+/* Section head spacing tweak for order page */
+.nm-order .nm-order__section{ margin-top:12px; scroll-margin-top:100px; }

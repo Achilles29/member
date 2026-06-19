@@ -7,7 +7,7 @@
                 data-harga="<?= $p->harga_jual ?>"
                 data-foto="<?= $p->foto ?>">
                 <?php if ($p->foto): ?>
-                    <img src="https://dashboard.namuacoffee.com/uploads/produk/<?= $p->foto ?>" class="card-img-top" style="height:120px; object-fit:cover;">
+                    <img src="https://core.namuacoffee.com/uploads/produk/<?= $p->foto ?>" class="card-img-top" style="height:120px; object-fit:cover;">
                 <?php endif ?>
                 <div class="card-body text-center py-2 px-1">
                     <h6 class="card-title mb-1" style="font-size:14px; font-weight:600"><?= strtoupper($p->nama_produk) ?></h6>
