@@ -40,32 +40,32 @@
     </div>
   <?php endif; ?>
 
-  <!-- Search bar (sticky below hero) -->
-  <div class="nm-card nm-order__search">
-    <div class="nm-order__searchRow">
-      <i class="f7-icons" aria-hidden="true">search</i>
-      <input id="nmSearch" type="search" placeholder="Cari menu..." autocomplete="off">
+  <!-- Sticky header: search + category tabs (one block, zero gap) -->
+  <div class="nm-order__stickyhead">
+    <div class="nm-order__search">
+      <div class="nm-order__searchRow">
+        <i class="f7-icons" aria-hidden="true">search</i>
+        <input id="nmSearch" type="search" placeholder="Cari menu..." autocomplete="off">
+      </div>
     </div>
-  </div>
-
-  <!-- Category tab strip + dropdown trigger (always visible) -->
-  <div class="nm-order__tabbar">
-    <div class="nm-order__tabs" id="nmCatTabs">
-      <button type="button" class="nm-order__tab is-active" data-kat-id="" data-kat-nama="Semua">
-        Semua
+    <div class="nm-order__tabbar">
+      <div class="nm-order__tabs" id="nmCatTabs">
+        <button type="button" class="nm-order__tab is-active" data-kat-id="" data-kat-nama="Semua">
+          Semua
+        </button>
+        <?php foreach (($kategori ?? []) as $kat): ?>
+          <button
+            type="button"
+            class="nm-order__tab"
+            data-kat-id="<?= (int) $kat->id ?>"
+            data-kat-nama="<?= html_escape($kat->nama_kategori) ?>"
+          ><?= html_escape($kat->nama_kategori) ?></button>
+        <?php endforeach; ?>
+      </div>
+      <button type="button" class="nm-order__tab-more" id="nmOpenCategories" aria-label="Semua kategori">
+        <i class="f7-icons">line_horizontal_3</i>
       </button>
-      <?php foreach (($kategori ?? []) as $kat): ?>
-        <button
-          type="button"
-          class="nm-order__tab"
-          data-kat-id="<?= (int) $kat->id ?>"
-          data-kat-nama="<?= html_escape($kat->nama_kategori) ?>"
-        ><?= html_escape($kat->nama_kategori) ?></button>
-      <?php endforeach; ?>
     </div>
-    <button type="button" class="nm-order__tab-more" id="nmOpenCategories" aria-label="Semua kategori">
-      <i class="f7-icons">line_horizontal_3</i>
-    </button>
   </div>
 
   <!-- Product sections -->

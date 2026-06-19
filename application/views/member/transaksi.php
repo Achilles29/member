@@ -1,76 +1,72 @@
 <div class="page-content nm-page">
-  <div class="nm-topbar nm-topbar--mini">
-    <div>
-      <div class="nm-name">Riwayat Transaksi</div>
-      <div class="nm-level"><?= html_escape($member['nama'] ?? 'Member') ?></div>
+
+  <div class="nm-page-hero nm-page-hero--trx">
+    <div class="nm-page-hero__nav">
+      <a href="<?= site_url('member') ?>" class="nm-hero-back"><i class="f7-icons">chevron_left</i></a>
+      <span class="nm-page-hero__label">Riwayat Transaksi</span>
+      <a href="<?= site_url('member/logout') ?>" class="nm-logout"><i class="f7-icons">rectangle_porous_arrow_right</i></a>
     </div>
-    <a class="nm-logout" href="<?= site_url('member') ?>" title="Kembali">
-      <i class="f7-icons">chevron_left</i>
-    </a>
+    <div class="nm-page-hero__center" style="padding-bottom:4px;">
+      <div class="nm-page-hero__emoji">🧾</div>
+      <div class="nm-page-hero__big"><?= (int)$total_rows ?></div>
+      <div class="nm-page-hero__sub">Transaksi ditemukan · <?= html_escape($member['nama'] ?? 'Member') ?></div>
+    </div>
   </div>
 
-  <div class="nm-card nm-filter-card">
-    <form method="get" class="nm-filter-f7">
-      <div class="nm-filter-row">
+  <!-- FILTER -->
+  <div class="nm-card nm-inline-filter">
+    <form method="get">
+      <div class="nm-inline-filter__row">
         <div class="nm-field">
           <label>Bulan</label>
           <select name="month">
             <?php for ($i = 0; $i < 12; $i++): ?>
-              <?php
-                $val = date('Y-m', strtotime("-{$i} month"));
-                $label = date('F Y', strtotime($val . '-01'));
-              ?>
-              <option value="<?= $val ?>" <?= ($month === $val) ? 'selected' : '' ?>>
-                <?= html_escape($label) ?>
-              </option>
+              <?php $val = date('Y-m', strtotime("-{$i} month")); $lbl = date('M Y', strtotime($val . '-01')); ?>
+              <option value="<?= $val ?>" <?= ($month === $val) ? 'selected' : '' ?>><?= html_escape($lbl) ?></option>
             <?php endfor; ?>
           </select>
         </div>
         <div class="nm-field">
-          <label>No Transaksi</label>
-          <input type="text" name="search" placeholder="Cari no transaksi..." value="<?= html_escape($search) ?>">
+          <label>Cari No</label>
+          <input type="text" name="search" placeholder="Nomor transaksi" value="<?= html_escape($search) ?>">
         </div>
-      </div>
-
-      <div class="nm-filter-row">
-        <div class="nm-field grow">
-          <label>Jumlah</label>
+        <div class="nm-field" style="max-width:80px;">
+          <label>Limit</label>
           <select name="limit">
-            <?php foreach (['10', '20', '50', 'semua'] as $v): ?>
-              <option value="<?= $v ?>" <?= ((string)$limit === (string)$v) ? 'selected' : '' ?>><?= ucfirst($v) ?></option>
+            <?php foreach (['10','20','50','semua'] as $v): ?>
+              <option value="<?= $v ?>" <?= ((string)$limit===$v)?'selected':'' ?>><?= ucfirst($v) ?></option>
             <?php endforeach; ?>
           </select>
         </div>
-        <button class="nm-btn-primary" type="submit">Tampilkan</button>
+        <button class="nm-inline-filter__go" type="submit"><i class="f7-icons">arrow_right_circle_fill</i></button>
       </div>
     </form>
   </div>
 
-  <div class="nm-section-head">
-    <div>
-      <div class="nm-section-title">Daftar Transaksi</div>
-      <div class="nm-section-sub"><?= (int)$total_rows ?> transaksi ditemukan</div>
-    </div>
-  </div>
-
   <?php if (empty($transaksi)): ?>
-    <div class="nm-card nm-empty-card">Belum ada transaksi di periode ini.</div>
+    <div class="nm-empty-state nm-card">
+      <div class="nm-empty-state__ico">🧾</div>
+      <div class="nm-empty-state__txt">Belum ada transaksi di periode ini.</div>
+    </div>
   <?php endif; ?>
 
   <?php foreach ($transaksi as $trx): ?>
     <?php
-      $total = (int)($trx['total_pembayaran'] ?: $trx['total_penjualan']);
+      $total   = (int)($trx['total_pembayaran'] ?: $trx['total_penjualan']);
       $tanggal = $trx['waktu_bayar'] ?: $trx['waktu_order'];
     ?>
-    <div class="nm-card nm-trx-row">
-      <div class="nm-trx-left">
-        <div class="nm-trx-no"><?= html_escape($trx['no_transaksi']) ?></div>
-        <div class="nm-trx-date"><?= date('d M Y H:i', strtotime($tanggal)) ?></div>
-        <div class="nm-trx-total">Rp <?= number_format($total) ?></div>
+    <div class="nm-card nm-trx-card">
+      <div class="nm-trx-card__top">
+        <div class="nm-trx-card__date-pill"><?= date('d M', strtotime($tanggal)) ?></div>
+        <div class="nm-trx-card__no"><?= html_escape($trx['no_transaksi']) ?></div>
+        <div class="nm-trx-card__total">Rp <?= number_format($total) ?></div>
       </div>
-      <div class="nm-trx-actions">
-        <a class="nm-trx-btn" href="<?= site_url('transaksi/detail/' . (int)$trx['id']) ?>">Detail</a>
-        <a class="nm-trx-btn is-secondary" href="<?= site_url('transaksi/struk/' . (int)$trx['id']) ?>">Lihat Struk</a>
+      <div class="nm-trx-card__foot">
+        <span class="nm-trx-card__time"><?= date('H:i', strtotime($tanggal)) ?> · <?= date('Y', strtotime($tanggal)) ?></span>
+        <div class="nm-trx-card__actions">
+          <a class="nm-trx-card__btn" href="<?= site_url('transaksi/detail/' . (int)$trx['id']) ?>">Detail</a>
+          <a class="nm-trx-card__btn nm-trx-card__btn--ghost" href="<?= site_url('transaksi/struk/' . (int)$trx['id']) ?>">Struk</a>
+        </div>
       </div>
     </div>
   <?php endforeach; ?>
@@ -78,14 +74,10 @@
   <?php if ($limit !== 'semua' && $total_pages > 1): ?>
     <div class="nm-pagination nm-pagination-f7">
       <?php for ($i = 1; $i <= $total_pages; $i++): ?>
-        <a
-          class="<?= ((int)$i === (int)$page) ? 'active' : '' ?>"
-          href="?month=<?= urlencode($month) ?>&search=<?= urlencode($search) ?>&limit=<?= urlencode($limit) ?>&page=<?= (int)$i ?>">
-          <?= (int)$i ?>
-        </a>
+        <a class="<?= ((int)$i===(int)$page)?'active':'' ?>"
+           href="?month=<?= urlencode($month) ?>&search=<?= urlencode($search) ?>&limit=<?= urlencode($limit) ?>&page=<?= (int)$i ?>"><?= (int)$i ?></a>
       <?php endfor; ?>
     </div>
   <?php endif; ?>
 </div>
-
 <?php $this->load->view('templates/member/bottom_nav'); ?>

@@ -1,180 +1,140 @@
+<?php
+$stamp_total = 0;
+if (!empty($stamp) && is_array($stamp)) {
+  $stamp_total = array_sum(array_column($stamp, 'jumlah_stamp'));
+}
+?>
 <div class="page-content nm-page">
 
-  <!-- TOPBAR MINI -->
-  <div class="nm-topbar nm-topbar--mini">
-    <div>
-      <div class="nm-name"><?= html_escape($member['nama'] ?? 'Guest') ?></div>
-      <div class="nm-level">Redeem Voucher</div>
+  <!-- HERO -->
+  <div class="nm-page-hero nm-page-hero--redeem">
+    <div class="nm-page-hero__nav">
+      <a href="<?= site_url('member') ?>" class="nm-hero-back"><i class="f7-icons">chevron_left</i></a>
+      <span class="nm-page-hero__label">Redeem Reward</span>
+      <a href="<?= site_url('member/logout') ?>" class="nm-logout"><i class="f7-icons">rectangle_porous_arrow_right</i></a>
     </div>
-
-    <a class="nm-logout" href="<?= site_url('member/logout') ?>" title="Logout">
-      <i class="f7-icons">rectangle_porous_arrow_right</i>
-    </a>
-  </div>
-
-  <?php
-    $stamp_total = 0;
-    if (!empty($stamp) && is_array($stamp)) {
-      $stamp_total = array_sum(array_column($stamp, 'jumlah_stamp'));
-    }
-  ?>
-
-  <!-- SALDO CARD -->
-  <div class="nm-redeem-hero">
-    <div class="nm-redeem-hero-card">
-      <div class="nm-redeem-hero-title">Saldo Kamu</div>
-
-      <div class="nm-redeem-hero-row">
-        <div class="nm-redeem-balance">
-          <div class="nm-redeem-balance-label">Poin</div>
-          <div class="nm-redeem-balance-value"><?= number_format((int)$poin) ?> <span>⭐</span></div>
-        </div>
-
-        <div class="nm-redeem-balance">
-          <div class="nm-redeem-balance-label">Stamp</div>
-          <div class="nm-redeem-balance-value"><?= number_format((int)$stamp_total) ?> <span>🟤</span></div>
-        </div>
+    <div class="nm-phero-chips">
+      <div class="nm-phero-chip nm-phero-chip--lg">
+        <span class="nm-phero-chip__ico">⭐</span>
+        <span class="nm-phero-chip__n"><?= number_format((int)$poin) ?></span>
+        <span class="nm-phero-chip__l">Poin</span>
       </div>
-
-      <?php if ($this->session->flashdata('success')): ?>
-        <div class="nm-alert success"><?= html_escape($this->session->flashdata('success')) ?></div>
-      <?php elseif ($this->session->flashdata('error')): ?>
-        <div class="nm-alert danger"><?= html_escape($this->session->flashdata('error')) ?></div>
-      <?php endif; ?>
-    </div>
-  </div>
-
-  <!-- TABS -->
-  <div class="nm-redeem-tabs">
-    <button class="nm-rtab is-active" type="button" data-tab="poin">
-      Dari Poin <span class="nm-rbadge"><?= is_array($redeem_poin ?? null) ? count($redeem_poin) : 0 ?></span>
-    </button>
-    <button class="nm-rtab" type="button" data-tab="stamp">
-      Dari Stamp <span class="nm-rbadge"><?= is_array($redeem_stamp ?? null) ? count($redeem_stamp) : 0 ?></span>
-    </button>
-  </div>
-
-  <!-- LIST POIN -->
-  <div id="tab-poin" class="nm-redeem-list is-show">
-    <div class="nm-section-head">
-      <div>
-        <div class="nm-section-title">Voucher dari Poin</div>
-        <div class="nm-section-sub">Tukarkan poin jadi voucher</div>
+      <div class="nm-phero-chip nm-phero-chip--lg nm-phero-chip--amber">
+        <span class="nm-phero-chip__ico">☕</span>
+        <span class="nm-phero-chip__n"><?= number_format((int)$stamp_total) ?></span>
+        <span class="nm-phero-chip__l">Stamp</span>
       </div>
     </div>
-
-    <?php if (!empty($redeem_poin)): ?>
-      <?php foreach ($redeem_poin as $item): ?>
-        <?php
-          $need = (int)($item['jumlah_dibutuhkan'] ?? 0);
-          $cukup = ((int)$poin >= $need);
-
-          // Deskripsi voucher
-          $desc = '';
-          if (($item['jenis_voucher'] ?? '') === 'produk' && !empty($item['produk_id'])) {
-            $desc = 'Produk: ' . html_escape($item['produk_nama'] ?? 'Produk tidak ditemukan');
-          } elseif (($item['jenis_voucher'] ?? '') === 'diskon') {
-            if (($item['tipe_diskon'] ?? '') === 'persentase') {
-              $max = number_format((int)($item['max_diskon'] ?? 0), 0, ',', '.');
-              $desc = 'Diskon ' . (int)($item['nilai_voucher'] ?? 0) . '% (max Rp ' . $max . ')';
-            } else {
-              $desc = 'Diskon Rp ' . number_format((int)($item['nilai_voucher'] ?? 0), 0, ',', '.');
-            }
-          }
-        ?>
-
-        <div class="nm-card nm-redeem-card">
-          <div class="nm-redeem-head">
-            <div class="nm-redeem-title"><?= html_escape($item['nama_redeem'] ?? 'Redeem') ?></div>
-            <span class="nm-badge neutral">Poin</span>
-          </div>
-
-          <?php if ($desc): ?>
-            <div class="nm-redeem-desc"><?= $desc ?></div>
-          <?php endif; ?>
-
-          <div class="nm-redeem-need">
-            <span>Butuh</span>
-            <b><?= number_format($need) ?> ⭐</b>
-          </div>
-
-          <div class="nm-redeem-foot">
-            <div class="nm-redeem-owned">Poin kamu: <b><?= number_format((int)$poin) ?></b></div>
-
-            <?php if ($cukup): ?>
-              <a href="<?= site_url('redeem/process/' . (int)$item['id']) ?>" class="nm-btn-primary nm-redeem-btn redeem-trigger">
-                Redeem
-              </a>
-            <?php else: ?>
-              <span class="nm-redeem-btn-disabled">Tidak Cukup</span>
-            <?php endif; ?>
-          </div>
-        </div>
-      <?php endforeach; ?>
-    <?php else: ?>
-      <div class="nm-card nm-empty-card">Belum ada voucher yang bisa diredeem dengan poin.</div>
+    <?php if ($this->session->flashdata('success')): ?>
+      <div class="nm-alert success" style="margin-top:12px;"><?= html_escape($this->session->flashdata('success')) ?></div>
+    <?php elseif ($this->session->flashdata('error')): ?>
+      <div class="nm-alert danger" style="margin-top:12px;"><?= html_escape($this->session->flashdata('error')) ?></div>
     <?php endif; ?>
   </div>
 
-  <!-- LIST STAMP -->
-  <div id="tab-stamp" class="nm-redeem-list">
-    <div class="nm-section-head">
-      <div>
-        <div class="nm-section-title">Voucher dari Stamp</div>
-        <div class="nm-section-sub">Tukarkan stamp jadi voucher</div>
-      </div>
-    </div>
+  <!-- TABS -->
+  <div class="nm-vtabs">
+    <button class="nm-vtab is-active" type="button" data-tab="poin">
+      Dari Poin <span class="nm-vtab-badge"><?= is_array($redeem_poin ?? null) ? count($redeem_poin) : 0 ?></span>
+    </button>
+    <button class="nm-vtab" type="button" data-tab="stamp">
+      Dari Stamp <span class="nm-vtab-badge"><?= is_array($redeem_stamp ?? null) ? count($redeem_stamp) : 0 ?></span>
+    </button>
+  </div>
 
+  <!-- POIN TAB -->
+  <div id="tab-poin" class="nm-tab-panel is-show">
+    <?php if (!empty($redeem_poin)): ?>
+      <?php foreach ($redeem_poin as $item): ?>
+        <?php
+          $need  = (int)($item['jumlah_dibutuhkan'] ?? 0);
+          $cukup = ((int)$poin >= $need);
+          $desc  = '';
+          if (($item['jenis_voucher'] ?? '') === 'produk' && !empty($item['produk_id']))
+            $desc = 'Gratis: ' . html_escape($item['produk_nama'] ?? 'Produk');
+          elseif (($item['jenis_voucher'] ?? '') === 'diskon') {
+            if (($item['tipe_diskon'] ?? '') === 'persentase')
+              $desc = 'Diskon ' . (int)($item['nilai_voucher'] ?? 0) . '% (max Rp ' . number_format((int)($item['max_diskon'] ?? 0), 0, ',', '.') . ')';
+            else
+              $desc = 'Diskon Rp ' . number_format((int)($item['nilai_voucher'] ?? 0), 0, ',', '.');
+          }
+        ?>
+        <div class="nm-card nm-redeem-card <?= $cukup ? '' : 'nm-redeem-card--dim' ?>">
+          <div class="nm-redeem-card__head">
+            <div class="nm-redeem-card__icon">🎁</div>
+            <div style="flex:1;min-width:0;">
+              <div class="nm-redeem-card__name"><?= html_escape($item['nama_redeem'] ?? 'Redeem') ?></div>
+              <?php if ($desc): ?><div class="nm-redeem-card__desc"><?= $desc ?></div><?php endif; ?>
+            </div>
+            <span class="nm-badge neutral">Poin</span>
+          </div>
+          <div class="nm-redeem-card__foot">
+            <div class="nm-redeem-card__cost">
+              <span>Butuh</span>
+              <strong><?= number_format($need) ?> ⭐</strong>
+              <span class="nm-redeem-card__own">/ kamu <?= number_format((int)$poin) ?></span>
+            </div>
+            <?php if ($cukup): ?>
+              <a href="<?= site_url('redeem/process/' . (int)$item['id']) ?>" class="nm-redeem-card__btn redeem-trigger">Redeem</a>
+            <?php else: ?>
+              <span class="nm-redeem-card__btn nm-redeem-card__btn--off">Kurang</span>
+            <?php endif; ?>
+          </div>
+          <?php if ($cukup): ?>
+            <div class="nm-redeem-card__prog"><div style="width:100%;"></div></div>
+          <?php else: ?>
+            <div class="nm-redeem-card__prog"><div style="width:<?= min(100, round((int)$poin / max(1, $need) * 100)) ?>%;"></div></div>
+          <?php endif; ?>
+        </div>
+      <?php endforeach; ?>
+    <?php else: ?>
+      <div class="nm-empty-state nm-card"><div class="nm-empty-state__ico">⭐</div><div class="nm-empty-state__txt">Belum ada voucher yang bisa diredeem dengan poin.</div></div>
+    <?php endif; ?>
+  </div>
+
+  <!-- STAMP TAB -->
+  <div id="tab-stamp" class="nm-tab-panel">
     <?php if (!empty($redeem_stamp)): ?>
       <?php foreach ($redeem_stamp as $item): ?>
         <?php
-          $need = (int)($item['jumlah_dibutuhkan'] ?? 0);
+          $need  = (int)($item['jumlah_dibutuhkan'] ?? 0);
           $cukup = ((int)$stamp_total >= $need);
-
-          $desc = '';
-          if (($item['jenis_voucher'] ?? '') === 'produk' && !empty($item['produk_id'])) {
-            $desc = 'Produk: ' . html_escape($item['produk_nama'] ?? 'Produk tidak ditemukan');
-          } elseif (($item['jenis_voucher'] ?? '') === 'diskon') {
-            if (($item['tipe_diskon'] ?? '') === 'persentase') {
-              $max = number_format((int)($item['max_diskon'] ?? 0), 0, ',', '.');
-              $desc = 'Diskon ' . (int)($item['nilai_voucher'] ?? 0) . '% (max Rp ' . $max . ')';
-            } else {
+          $desc  = '';
+          if (($item['jenis_voucher'] ?? '') === 'produk' && !empty($item['produk_id']))
+            $desc = 'Gratis: ' . html_escape($item['produk_nama'] ?? 'Produk');
+          elseif (($item['jenis_voucher'] ?? '') === 'diskon') {
+            if (($item['tipe_diskon'] ?? '') === 'persentase')
+              $desc = 'Diskon ' . (int)($item['nilai_voucher'] ?? 0) . '% (max Rp ' . number_format((int)($item['max_diskon'] ?? 0), 0, ',', '.') . ')';
+            else
               $desc = 'Diskon Rp ' . number_format((int)($item['nilai_voucher'] ?? 0), 0, ',', '.');
-            }
           }
         ?>
-
-        <div class="nm-card nm-redeem-card">
-          <div class="nm-redeem-head">
-            <div class="nm-redeem-title"><?= html_escape($item['nama_redeem'] ?? 'Redeem') ?></div>
+        <div class="nm-card nm-redeem-card <?= $cukup ? '' : 'nm-redeem-card--dim' ?>">
+          <div class="nm-redeem-card__head">
+            <div class="nm-redeem-card__icon">☕</div>
+            <div style="flex:1;min-width:0;">
+              <div class="nm-redeem-card__name"><?= html_escape($item['nama_redeem'] ?? 'Redeem') ?></div>
+              <?php if ($desc): ?><div class="nm-redeem-card__desc"><?= $desc ?></div><?php endif; ?>
+            </div>
             <span class="nm-badge neutral">Stamp</span>
           </div>
-
-          <?php if ($desc): ?>
-            <div class="nm-redeem-desc"><?= $desc ?></div>
-          <?php endif; ?>
-
-          <div class="nm-redeem-need">
-            <span>Butuh</span>
-            <b><?= number_format($need) ?> Stamp</b>
-          </div>
-
-          <div class="nm-redeem-foot">
-            <div class="nm-redeem-owned">Stamp kamu: <b><?= number_format((int)$stamp_total) ?></b></div>
-
+          <div class="nm-redeem-card__foot">
+            <div class="nm-redeem-card__cost">
+              <span>Butuh</span>
+              <strong><?= number_format($need) ?> ☕</strong>
+              <span class="nm-redeem-card__own">/ kamu <?= number_format((int)$stamp_total) ?></span>
+            </div>
             <?php if ($cukup): ?>
-              <a href="<?= site_url('redeem/process/' . (int)$item['id']) ?>" class="nm-btn-primary nm-redeem-btn redeem-trigger">
-                Redeem
-              </a>
+              <a href="<?= site_url('redeem/process/' . (int)$item['id']) ?>" class="nm-redeem-card__btn redeem-trigger">Redeem</a>
             <?php else: ?>
-              <span class="nm-redeem-btn-disabled">Tidak Cukup</span>
+              <span class="nm-redeem-card__btn nm-redeem-card__btn--off">Kurang</span>
             <?php endif; ?>
           </div>
+          <div class="nm-redeem-card__prog"><div style="width:<?= min(100, round((int)$stamp_total / max(1, $need) * 100)) ?>%;"></div></div>
         </div>
-
       <?php endforeach; ?>
     <?php else: ?>
-      <div class="nm-card nm-empty-card">Belum ada voucher yang bisa diredeem dengan stamp.</div>
+      <div class="nm-empty-state nm-card"><div class="nm-empty-state__ico">☕</div><div class="nm-empty-state__txt">Belum ada voucher yang bisa diredeem dengan stamp.</div></div>
     <?php endif; ?>
   </div>
 
@@ -182,44 +142,30 @@
 
 <?php $this->load->view('templates/member/bottom_nav'); ?>
 
-<!-- Modal Loading -->
 <div id="nm-loading" class="nm-loading" style="display:none;">
-  <div class="nm-loading-card">
-    <div class="nm-loading-spin"></div>
-    <div class="nm-loading-text">Memproses...</div>
-  </div>
+  <div class="nm-loading-card"><div class="nm-loading-spin"></div><div class="nm-loading-text">Memproses...</div></div>
 </div>
 
 <script>
-  // tab switch
-  const tabs = document.querySelectorAll('.nm-rtab');
-  const tabPoin = document.getElementById('tab-poin');
-  const tabStamp = document.getElementById('tab-stamp');
-
-  tabs.forEach(btn => {
-    btn.addEventListener('click', () => {
-      tabs.forEach(b => b.classList.remove('is-active'));
+(function(){
+  document.querySelectorAll('.nm-vtab[data-tab]').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      document.querySelectorAll('.nm-vtab[data-tab]').forEach(function(b){b.classList.remove('is-active');});
       btn.classList.add('is-active');
-
-      const t = btn.getAttribute('data-tab');
-      if (t === 'poin') {
-        tabPoin.classList.add('is-show');
-        tabStamp.classList.remove('is-show');
-      } else {
-        tabStamp.classList.add('is-show');
-        tabPoin.classList.remove('is-show');
-      }
+      var t=btn.getAttribute('data-tab');
+      document.querySelectorAll('.nm-tab-panel').forEach(function(p){p.classList.remove('is-show');});
+      var el=document.getElementById('tab-'+t);
+      if(el)el.classList.add('is-show');
     });
   });
-
-  // confirm + loading overlay
-  document.querySelectorAll('.redeem-trigger').forEach(a => {
-    a.addEventListener('click', function(e){
+  document.querySelectorAll('.redeem-trigger').forEach(function(a){
+    a.addEventListener('click',function(e){
       e.preventDefault();
-      if (confirm('Apakah Anda yakin ingin menukar poin/stamp untuk voucher ini?')) {
-        document.getElementById('nm-loading').style.display = 'flex';
-        window.location.href = this.href;
+      if(confirm('Tukar poin/stamp untuk voucher ini?')){
+        document.getElementById('nm-loading').style.display='flex';
+        window.location.href=this.href;
       }
     });
   });
+})();
 </script>
