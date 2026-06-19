@@ -14,6 +14,13 @@
   // WAJIB create view
   app.views.create('.view-main', { stackPages: false });
 
+  // Pindahkan tabbar ke langsung di bawah body agar position:fixed
+  // tidak terpengaruh transform/overflow milik .view/.page Framework7
+  (function(){
+    var tb = document.querySelector('.nm-tabbar');
+    if (tb) document.body.appendChild(tb);
+  })();
+
   // BIAR LINK CI3 dianggap normal (full reload)
   document.addEventListener('click', function (e) {
     const a = e.target.closest('a');
