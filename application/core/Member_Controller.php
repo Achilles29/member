@@ -98,15 +98,37 @@ class Member_Controller extends CI_Controller
     }
 
     /**
-     * Validate CSRF token
+     * Validate CSRF token (session-based, karena CI3 csrf_protection=false di config).
+     * Token di-generate saat GET (get_csrf_token()), dikirim via hidden field, dicek di sini.
      */
     protected function validate_csrf()
     {
-        if ($this->input->method() === 'post') {
-            if (!$this->security->get_csrf_hash()) {
-                show_error('Invalid CSRF token', 403);
-            }
+        if ($this->input->method() !== 'post') {
+            return;
         }
+
+        $session_token = $this->session->userdata('csrf_token');
+        $post_token    = $this->input->post('csrf_token');
+
+        if (!$session_token || !$post_token || !hash_equals($session_token, $post_token)) {
+            show_error('Request tidak valid. Silakan muat ulang halaman dan coba lagi.', 403);
+        }
+
+        // Regenerate setelah setiap POST agar token tidak bisa dipakai ulang
+        $this->session->set_userdata('csrf_token', bin2hex(random_bytes(16)));
+    }
+
+    /**
+     * Ambil CSRF token untuk disertakan di form (generate jika belum ada).
+     */
+    protected function get_csrf_token(): string
+    {
+        $token = $this->session->userdata('csrf_token');
+        if (!$token) {
+            $token = bin2hex(random_bytes(16));
+            $this->session->set_userdata('csrf_token', $token);
+        }
+        return $token;
     }
 
     /**

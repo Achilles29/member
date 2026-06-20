@@ -3574,3 +3574,394 @@ body{
   animation:nm-spin .7s linear infinite;
   flex-shrink:0;
 }
+
+/* =========================================================
+   LOYALTY HUB  — unified poin + stamp + voucher
+========================================================= */
+
+/* ── Hero color themes ─────────────────────────────────── */
+.nm-lty-hero {
+  background: linear-gradient(145deg,#8b1c1c 0%,#b12a2a 55%,#c9372d 100%);
+}
+.nm-lty-hero.lh-poin {
+  background: linear-gradient(145deg,#8b1c1c 0%,#b12a2a 55%,#c9372d 100%);
+}
+.nm-lty-hero.lh-stamp {
+  background: linear-gradient(145deg,#78350f 0%,#92400e 55%,#b45309 100%);
+}
+.nm-lty-hero.lh-voucher {
+  background: linear-gradient(145deg,#3730a3 0%,#4338ca 55%,#6366f1 100%);
+}
+
+/* ── 3-stat card row ───────────────────────────────────── */
+.nm-lty-stats {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px 20px;
+}
+.nm-lty-stat {
+  flex: 1;
+  background: rgba(255,255,255,.13);
+  border: 1.5px solid rgba(255,255,255,.2);
+  border-radius: 16px;
+  padding: 12px 8px;
+  text-align: center;
+  cursor: pointer;
+  transition: background .2s, border-color .2s, transform .2s, box-shadow .2s;
+  color: rgba(255,255,255,.72);
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.nm-lty-stat.is-active {
+  background: rgba(255,255,255,.26);
+  border-color: rgba(255,255,255,.5);
+  color: #fff;
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(0,0,0,.22);
+}
+.nm-lty-stat:active { transform: scale(.95) translateY(0); }
+.nm-lty-stat__ico   { font-size: 20px; margin-bottom: 4px; line-height: 1; display: flex; justify-content: center; }
+.nm-lty-stat__ico .f7-icons { font-size: 20px !important; color: inherit; }
+.nm-lty-stat__val   { font-size: 21px; font-weight: 800; line-height: 1.1; }
+.nm-lty-stat__frac  { font-size: 12px; font-weight: 500; opacity: .7; }
+.nm-lty-stat__lbl   {
+  font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .6px;
+  margin-top: 5px;
+}
+.nm-lty-stat__sub {
+  font-size: 10px; opacity: .62; margin-top: 2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* ── Pill tab bar ──────────────────────────────────────── */
+.nm-pill-tabs {
+  position: relative;
+  display: flex;
+  background: #fff;
+  border-radius: 14px;
+  margin: 0 16px 16px;
+  padding: 4px;
+  box-shadow: 0 2px 14px rgba(0,0,0,.09);
+}
+.nm-pill-tab {
+  flex: 1;
+  position: relative;
+  z-index: 2;
+  background: none;
+  border: none;
+  padding: 10px 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 10px;
+  transition: color .2s;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+.nm-pill-tab.is-active { color: var(--primary); }
+.nm-pill-tab .f7-icons { font-size: 13px !important; vertical-align: -1px; }
+.nm-pill-tabs__slider {
+  position: absolute;
+  top: 4px; bottom: 4px; left: 4px;
+  width: 33%;
+  background: #fef2f2;
+  border-radius: 10px;
+  transition: left .25s cubic-bezier(.35,0,.25,1),
+              width .25s cubic-bezier(.35,0,.25,1);
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* ── Panel / sub-panel visibility ─────────────────────── */
+.nm-lty-panel    { display: none; }
+.nm-lty-panel.is-show { display: block; }
+.nm-subtab-panel { display: none; }
+.nm-subtab-panel.is-show { display: block; }
+
+/* ── Poin: chips row ───────────────────────────────────── */
+.nm-lty-chips {
+  display: flex;
+  gap: 8px;
+  padding: 0 16px 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.nm-lty-chips::-webkit-scrollbar { display: none; }
+
+/* ── Stamp: summary card ───────────────────────────────── */
+.nm-lty-stamp-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px !important;
+  margin-bottom: 4px;
+}
+.nm-lty-stamp-left { flex: 1; min-width: 0; }
+.nm-lty-stamp-lbl  { font-size: 12px; color: var(--muted); font-weight: 600; margin-bottom: 4px; }
+.nm-lty-stamp-val  { font-size: 32px; font-weight: 800; color: var(--text); line-height: 1; }
+.nm-lty-stamp-tar  { font-size: 16px; font-weight: 500; color: var(--muted); }
+
+/* ring text in light card (override hero white text) */
+.nm-lty-ring-pct         { color: var(--text); }
+.nm-lty-ring-pct b       { color: var(--primary); font-size: 16px; display: block; line-height: 1; }
+.nm-lty-ring-pct small   { color: var(--muted); font-size: 10px; }
+.nm-lty-stamp-ring.nm-stamp-ring { flex-shrink: 0; }
+
+/* =========================================================
+   POIN PANEL — stat grid, filter, timeline
+========================================================= */
+
+/* ── Stat Grid ─────────────────────────────────────────── */
+.nm-poin-statgrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 1px;
+  background: #e5e7eb;
+  border-radius: 18px;
+  overflow: hidden;
+  margin: 0 16px 12px;
+  box-shadow: var(--shadow2);
+}
+.nm-poin-stat {
+  background: #fff;
+  padding: 16px 10px 14px;
+  text-align: center;
+}
+.nm-poin-stat__ico {
+  font-size: 11px;
+  margin-bottom: 6px;
+  line-height: 1;
+}
+.nm-poin-stat__ico .f7-icons {
+  font-size: 18px !important;
+  color: #9ca3af;
+}
+.nm-poin-stat__val {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1;
+}
+.nm-poin-stat__lbl {
+  font-size: 10px;
+  color: var(--muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  margin-top: 4px;
+}
+.nm-poin-stat--amber .nm-poin-stat__ico .f7-icons { color: #d97706; }
+.nm-poin-stat--amber .nm-poin-stat__val { color: #b45309; }
+.nm-poin-stat--red .nm-poin-stat__ico .f7-icons { color: #ef4444; }
+.nm-poin-stat--red .nm-poin-stat__val { color: #dc2626; }
+
+/* ── Filter Card ───────────────────────────────────────── */
+.nm-poin-filter {
+  margin: 0 16px 12px !important;
+  padding: 0 !important;
+  overflow: hidden;
+}
+.nm-poin-filter__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 16px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.nm-poin-filter__info {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  flex: 1;
+}
+.nm-poin-filter__info > .f7-icons {
+  font-size: 16px !important;
+  color: var(--primary);
+  flex-shrink: 0;
+}
+.nm-poin-filter__period {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nm-poin-filter__sep { color: var(--muted); margin: 0 2px; }
+.nm-poin-filter__limchip {
+  flex-shrink: 0;
+  background: #f3f4f6;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  padding: 2px 8px;
+}
+.nm-poin-filter__arrow {
+  font-size: 15px !important;
+  color: var(--muted);
+  transition: transform .25s;
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+.nm-poin-filter__arrow.is-open { transform: rotate(180deg); }
+
+.nm-poin-filter__body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height .3s ease;
+}
+.nm-poin-filter__body.is-open {
+  max-height: 140px;
+}
+.nm-poin-filter__fields {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 4px 16px 16px;
+  border-top: 1px solid #f3f4f6;
+}
+.nm-poin-filter__field {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.nm-poin-filter__field--sm { max-width: 76px; }
+.nm-poin-filter__field label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .3px;
+}
+.nm-poin-filter__field input,
+.nm-poin-filter__field select {
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  padding: 0 10px;
+  font-size: 12px;
+  background: #f9fafb;
+  outline: none;
+  color: var(--text);
+}
+.nm-poin-filter__submit {
+  flex-shrink: 0;
+  width: 40px; height: 40px;
+  border-radius: 12px;
+  background: var(--primary);
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.nm-poin-filter__submit .f7-icons { font-size: 18px !important; }
+
+/* ── Section Header ────────────────────────────────────── */
+.nm-poin-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px 10px;
+}
+.nm-poin-head__title {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text);
+}
+.nm-poin-head__meta {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+/* ── Poin Timeline ─────────────────────────────────────── */
+.nm-poin-timeline {
+  padding: 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.nm-ptl-row {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  position: relative;
+}
+.nm-ptl-row:not(:last-child) .nm-ptl-line {
+  position: absolute;
+  left: 17px;        /* center of 36px dot */
+  top: 36px;
+  bottom: 0;
+  width: 2px;
+  background: #e5e7eb;
+}
+/* dot */
+.nm-ptl-dot {
+  flex-shrink: 0;
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 12px;
+  position: relative;
+  z-index: 1;
+}
+.nm-ptl-dot .f7-icons { font-size: 16px !important; color: #fff; }
+.nm-ptl-dot--plus  { background: linear-gradient(135deg,#16a34a,#22c55e); }
+.nm-ptl-dot--minus { background: linear-gradient(135deg,var(--primary),var(--primary2)); }
+.nm-ptl-dot--exp   { background: linear-gradient(135deg,#9ca3af,#d1d5db); }
+
+/* card */
+.nm-ptl-card {
+  flex: 1;
+  padding: 12px 14px !important;
+  margin: 8px 0;
+}
+.nm-ptl-card__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.nm-ptl-pts {
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1;
+}
+.nm-ptl-pts--poin-plus  { color: #16a34a; }
+.nm-ptl-pts--poin-minus { color: var(--primary); }
+.nm-ptl-pts--poin-exp   { color: #9ca3af; }
+
+.nm-ptl-card__label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 5px;
+}
+.nm-ptl-card__date {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.nm-ptl-card__date .f7-icons { font-size: 11px !important; }
+.nm-ptl-card__time {
+  margin-left: 4px;
+  background: #f3f4f6;
+  border-radius: 6px;
+  padding: 1px 6px;
+  font-weight: 600;
+  color: var(--muted);
+}
+

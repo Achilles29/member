@@ -21,19 +21,9 @@ $self_order_available = $ci->db->table_exists('crm_member')
     </a>
     <?php endif; ?>
 
-    <a href="<?= site_url('poin') ?>" class="tab-link <?= ($active_menu ?? '') === 'poin' ? 'tab-link-active' : '' ?>">
-      <i class="f7-icons">star</i>
-      <span class="tabbar-label">Poin</span>
-    </a>
-
-    <a href="<?= site_url('stamp') ?>" class="tab-link <?= ($active_menu ?? '') === 'stamp' ? 'tab-link-active' : '' ?>">
-      <i class="f7-icons">bookmark</i>
-      <span class="tabbar-label">Stamp</span>
-    </a>
-
-    <a href="<?= site_url('voucher') ?>" class="tab-link <?= ($active_menu ?? '') === 'voucher' ? 'tab-link-active' : '' ?>">
-      <i class="f7-icons">ticket</i>
-      <span class="tabbar-label">Voucher</span>
+    <a href="<?= site_url('loyalitas') ?>" class="tab-link <?= in_array(($active_menu ?? ''), ['reward','poin','stamp','voucher']) ? 'tab-link-active' : '' ?>">
+      <i class="f7-icons">rosette</i>
+      <span class="tabbar-label">Reward</span>
     </a>
 
     <a href="<?= site_url('redeem') ?>" class="tab-link <?= ($active_menu ?? '') === 'redeem' ? 'tab-link-active' : '' ?>">

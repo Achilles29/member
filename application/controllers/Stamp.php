@@ -16,6 +16,8 @@ class Stamp extends CI_Controller
         if (!$this->session->userdata('member_id')) {
             redirect('login');
         }
+        redirect('loyalitas?tab=stamp');
+        exit;
 
         $member_id = $this->session->userdata('member_id');
         $data['member'] = $this->Member_model->get_member_by_id($member_id);

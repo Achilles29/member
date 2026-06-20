@@ -59,6 +59,7 @@ $lvl_cls  = 'nm-level-badge--' . strtolower($level);
       <button type="button" class="nm-iconbtn" id="btnCloseEdit"><i class="f7-icons">xmark</i></button>
     </div>
     <form action="<?= site_url('profile/update') ?>" method="post" enctype="multipart/form-data" class="nm-form">
+      <input type="hidden" name="csrf_token" value="<?= html_escape($csrf_token ?? '') ?>">
       <input type="hidden" name="id" value="<?= (int)($member['id'] ?? 0) ?>">
       <div class="nm-form-grid">
         <div class="nm-field"><label>Nama</label><input type="text" name="nama" value="<?= html_escape($member['nama'] ?? '') ?>" required></div>
@@ -67,13 +68,14 @@ $lvl_cls  = 'nm-level-badge--' . strtolower($level);
         <div class="nm-field">
           <label>Jenis Kelamin</label>
           <select name="jenis_kelamin">
+            <option value="" <?= empty($member['jenis_kelamin']) ? 'selected' : '' ?>>-- Pilih --</option>
             <option value="Laki-laki" <?= ($member['jenis_kelamin'] ?? '') === 'Laki-laki' ? 'selected' : '' ?>>Laki-laki</option>
             <option value="Perempuan" <?= ($member['jenis_kelamin'] ?? '') === 'Perempuan' ? 'selected' : '' ?>>Perempuan</option>
           </select>
         </div>
         <div class="nm-field"><label>Tanggal Lahir</label><input type="date" name="tanggal_lahir" value="<?= html_escape($member['tanggal_lahir'] ?? '') ?>"></div>
         <div class="nm-field" style="grid-column:1/-1;"><label>Alamat</label><input type="text" name="alamat" value="<?= html_escape($member['alamat'] ?? '') ?>"></div>
-        <div class="nm-field" style="grid-column:1/-1;"><label>Ganti Foto</label><input type="file" name="foto" accept="image/png,image/jpeg"><div class="nm-help">JPG/PNG, max 12MB</div></div>
+        <div class="nm-field" style="grid-column:1/-1;"><label>Ganti Foto</label><input type="file" name="foto" accept="image/png,image/jpeg"><div class="nm-help">JPG/PNG, max 2MB</div></div>
       </div>
       <div class="nm-form-actions">
         <button type="submit" class="nm-btn nm-btn--primary nm-btn--block">Simpan Perubahan</button>

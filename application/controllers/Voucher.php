@@ -31,6 +31,9 @@ class Voucher extends CI_Controller
     public function index()
     {
         $this->require_login();
+        redirect('loyalitas?tab=voucher');
+        exit;
+
         $d = $this->base_data();
 
         $data['title'] = 'Voucher Saya';

@@ -21,6 +21,8 @@ class Poin extends CI_Controller
     public function index()
     {
         $this->check_login();
+        redirect('loyalitas?tab=poin');
+        exit;
 
         $member_id = $this->session->userdata('member_id');
 

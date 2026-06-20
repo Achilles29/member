@@ -27,8 +27,9 @@ class Profile extends Member_Controller
     public function index()
     {
         $data = [
-            'title' => 'Profil Saya',
-            'active_menu' => 'akun'
+            'title'       => 'Profil Saya',
+            'active_menu' => 'akun',
+            'csrf_token'  => $this->get_csrf_token(),
         ];
 
         $this->render('member/profile', $data);
@@ -45,7 +46,7 @@ class Profile extends Member_Controller
         $this->form_validation->set_rules('nama', 'Nama', 'required|trim|min_length[3]|max_length[100]');
         $this->form_validation->set_rules('email', 'Email', 'trim|valid_email');
         $this->form_validation->set_rules('telepon', 'Nomor Telepon', 'required|trim|numeric|min_length[10]|max_length[15]');
-        $this->form_validation->set_rules('jenis_kelamin', 'Jenis Kelamin', 'in_list[L,P]');
+        $this->form_validation->set_rules('jenis_kelamin', 'Jenis Kelamin', 'permit_empty|in_list[Laki-laki,Perempuan]');
         $this->form_validation->set_rules('tanggal_lahir', 'Tanggal Lahir', 'trim');
         $this->form_validation->set_rules('alamat', 'Alamat', 'trim|max_length[500]');
 
