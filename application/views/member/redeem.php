@@ -176,10 +176,10 @@ $stamp_total = isset($stamp_total) ? (int) $stamp_total : 0;
       <p class="nm-modal-note">Pastikan kamu ingin menukarkan reward ini. Tindakan ini tidak dapat dibatalkan.</p>
       <div class="nm-modal-actions">
         <button class="nm-btn nm-btn--ghost" type="button" id="nmModalCancel">Batal</button>
-        <a class="nm-btn nm-btn--primary" id="nmModalConfirm" href="#">
+        <button class="nm-btn nm-btn--primary" type="button" id="nmModalConfirm">
           <div class="nm-modal-spin" id="nmModalSpin"></div>
           <span id="nmModalBtnTxt">Ya, Redeem!</span>
-        </a>
+        </button>
       </div>
     </div>
   </div>
@@ -200,30 +200,29 @@ $stamp_total = isset($stamp_total) ? (int) $stamp_total : 0;
   });
 
   // Modal elements
-  var overlay  = document.getElementById('nmRedeemOverlay');
-  var ico      = document.getElementById('nmModalIco');
-  var nama     = document.getElementById('nmModalNama');
-  var desc     = document.getElementById('nmModalDesc');
-  var saldo    = document.getElementById('nmModalSaldo');
-  var cost     = document.getElementById('nmModalCost');
-  var confirm  = document.getElementById('nmModalConfirm');
-  var cancel   = document.getElementById('nmModalCancel');
-  var spin     = document.getElementById('nmModalSpin');
-  var btnTxt   = document.getElementById('nmModalBtnTxt');
+  var overlay    = document.getElementById('nmRedeemOverlay');
+  var elIco      = document.getElementById('nmModalIco');
+  var elNama     = document.getElementById('nmModalNama');
+  var elDesc     = document.getElementById('nmModalDesc');
+  var elSaldo    = document.getElementById('nmModalSaldo');
+  var elCost     = document.getElementById('nmModalCost');
+  var elConfirm  = document.getElementById('nmModalConfirm');
+  var elCancel   = document.getElementById('nmModalCancel');
+  var elSpin     = document.getElementById('nmModalSpin');
+  var elBtnTxt   = document.getElementById('nmModalBtnTxt');
   var targetHref = '';
 
   function openModal(a) {
-    targetHref = a.href;
-    ico.textContent   = a.getAttribute('data-ico')        || '🎁';
-    nama.textContent  = a.getAttribute('data-nama')       || 'Reward';
-    desc.textContent  = a.getAttribute('data-desc')       || '';
-    var costLabel     = a.getAttribute('data-cost-label') || '';
-    saldo.textContent = a.getAttribute('data-saldo')      || '—';
-    cost.textContent  = (a.getAttribute('data-cost')      || '—') + ' ' + costLabel;
-    confirm.href = targetHref;
-    spin.style.display   = 'none';
-    btnTxt.textContent   = 'Ya, Redeem!';
-    confirm.style.pointerEvents = 'auto';
+    targetHref        = a.getAttribute('href') || '';
+    elIco.textContent  = a.getAttribute('data-ico')        || '🎁';
+    elNama.textContent = a.getAttribute('data-nama')       || 'Reward';
+    elDesc.textContent = a.getAttribute('data-desc')       || '';
+    var costLabel      = a.getAttribute('data-cost-label') || '';
+    elSaldo.textContent = a.getAttribute('data-saldo')     || '—';
+    elCost.textContent  = (a.getAttribute('data-cost')     || '—') + ' ' + costLabel;
+    elSpin.style.display        = 'none';
+    elBtnTxt.textContent        = 'Ya, Redeem!';
+    elConfirm.disabled          = false;
     overlay.classList.add('is-open');
     document.body.style.overflow = 'hidden';
   }
@@ -233,32 +232,32 @@ $stamp_total = isset($stamp_total) ? (int) $stamp_total : 0;
     document.body.style.overflow = '';
   }
 
-  // Open modal when redeem button clicked
+  // Open modal — stop propagation supaya capture-phase handler di footer tidak ikut menangkap
   document.querySelectorAll('.redeem-trigger').forEach(function (a) {
     a.addEventListener('click', function (e) {
       e.preventDefault();
+      e.stopPropagation();
       openModal(this);
     });
   });
 
-  // Cancel
-  cancel.addEventListener('click', closeModal);
+  // Batal
+  elCancel.addEventListener('click', closeModal);
 
-  // Close when clicking backdrop
+  // Klik backdrop
   overlay.addEventListener('click', function (e) {
     if (e.target === overlay) closeModal();
   });
 
-  // Confirm → show spinner, navigate
-  confirm.addEventListener('click', function (e) {
+  // Konfirmasi → spinner → navigate
+  elConfirm.addEventListener('click', function () {
     if (!targetHref) return;
-    e.preventDefault();
-    spin.style.display   = 'block';
-    btnTxt.textContent   = 'Memproses...';
-    confirm.style.pointerEvents = 'none';
+    elSpin.style.display = 'block';
+    elBtnTxt.textContent = 'Memproses...';
+    elConfirm.disabled   = true;
     setTimeout(function () {
       window.location.href = targetHref;
-    }, 200);
+    }, 300);
   });
 })();
 </script>

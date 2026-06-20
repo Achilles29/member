@@ -3473,7 +3473,7 @@ body{
 .nm-modal-sheet{
   background:#fff;
   border-radius:24px 24px 0 0;
-  padding:0 0 env(safe-area-inset-bottom,16px);
+  padding:0 0 calc(60px + env(safe-area-inset-bottom, 0px));
   width:100%;
   max-width:420px;
   transform:translateY(100%);

@@ -26,6 +26,9 @@
     const a = e.target.closest('a');
     if (!a) return;
 
+    // Skip link yang sudah punya handler modal sendiri
+    if (a.dataset.modal || a.classList.contains('redeem-trigger')) return;
+
     const href = a.getAttribute('href');
     if (!href) return;
 
