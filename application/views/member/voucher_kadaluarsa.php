@@ -21,24 +21,27 @@
 
   <?php if (!empty($voucher_kadaluarsa)): ?>
     <?php foreach ($voucher_kadaluarsa as $v): ?>
+      <?php
+        $akhir = !empty($v['tanggal_berakhir']) ? date('d M Y', strtotime($v['tanggal_berakhir'])) : '-';
+        $desc  = $v['description'] ?? '-';
+      ?>
       <div class="nm-ticket nm-ticket--expired">
-        <div class="nm-ticket__left">
-          <div class="nm-ticket__badge-wrap"><span class="nm-badge danger">Kadaluarsa</span></div>
-          <div class="nm-ticket__icon" style="opacity:.4;filter:grayscale(1);">🎟</div>
+        <div class="nm-ticket__left nm-ticket__left--expired">
+          <span class="nm-badge danger">Kadaluarsa</span>
+          <div class="nm-ticket__lico" style="opacity:.3;filter:grayscale(1);">🎟</div>
         </div>
-        <div class="nm-ticket__sep"></div>
+        <div class="nm-ticket__vline nm-ticket__vline--expired"></div>
         <div class="nm-ticket__body">
-          <div class="nm-ticket__code" style="opacity:.6;"><?= html_escape($v['kode_voucher'] ?? '-') ?></div>
-          <div class="nm-ticket__desc"><?= ($v['jenis'] ?? '') === 'produk' ? 'Gratis produk' : 'Diskon' ?></div>
-          <div class="nm-ticket__date">
-            <i class="f7-icons" style="font-size:12px;">clock</i>
-            Masa berlaku telah habis
+          <div class="nm-ticket__code" style="opacity:.55;"><?= html_escape($v['kode_voucher'] ?? '-') ?></div>
+          <div class="nm-ticket__desc" style="opacity:.65;"><?= $desc ?></div>
+          <div class="nm-ticket__date nm-ticket__date--exp">
+            <i class="f7-icons">clock</i>Berakhir <?= $akhir ?>
           </div>
         </div>
       </div>
     <?php endforeach; ?>
     <?php if (!empty($pagination_links)): ?>
-      <div class="nm-pagination nm-pagination-f7"><?= $pagination_links ?></div>
+      <div class="nm-pagination-f7"><?= $pagination_links ?></div>
     <?php endif; ?>
   <?php else: ?>
     <div class="nm-empty-state nm-card">

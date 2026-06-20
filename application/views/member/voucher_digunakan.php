@@ -21,18 +21,18 @@
 
   <?php if (!empty($voucher_digunakan)): ?>
     <?php foreach ($voucher_digunakan as $v): ?>
+      <?php $desc = $v['description'] ?? '-'; ?>
       <div class="nm-ticket nm-ticket--used">
-        <div class="nm-ticket__left">
-          <div class="nm-ticket__badge-wrap"><span class="nm-badge warning">Digunakan</span></div>
-          <div class="nm-ticket__icon" style="opacity:.5;">🎟</div>
+        <div class="nm-ticket__left nm-ticket__left--used">
+          <span class="nm-badge warning">Terpakai</span>
+          <div class="nm-ticket__lico" style="opacity:.45;filter:grayscale(1);">🎟</div>
         </div>
-        <div class="nm-ticket__sep"></div>
+        <div class="nm-ticket__vline nm-ticket__vline--used"></div>
         <div class="nm-ticket__body">
           <div class="nm-ticket__code"><?= html_escape($v['kode_voucher'] ?? '-') ?></div>
-          <div class="nm-ticket__desc"><?= ($v['jenis'] ?? '') === 'produk' ? 'Gratis produk' : 'Diskon' ?></div>
+          <div class="nm-ticket__desc"><?= $desc ?></div>
           <div class="nm-ticket__date">
-            <i class="f7-icons" style="font-size:12px;">checkmark_seal</i>
-            Sudah dipakai dalam transaksi
+            <i class="f7-icons">checkmark_seal</i>Sudah dipakai dalam transaksi
           </div>
         </div>
       </div>

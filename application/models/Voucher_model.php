@@ -33,22 +33,96 @@ class Voucher_model extends CI_Model
             return null;
         }
 
-        $campaign = $this->map_campaign_row($row);
-        $campaign['kode_voucher'] = $row['voucher_code'] ?? '-';
-        $campaign['code'] = $campaign['kode_voucher'];
-        $campaign['description'] = $campaign['campaign_name'] ?? 'Voucher';
-        $campaign['discount_type'] = ($campaign['tipe_diskon'] ?? 'nominal') === 'persentase' ? 'persentase' : 'nominal';
-        $campaign['discount_value'] = ($campaign['discount_type'] === 'persentase')
-            ? (float) ($row['percent_snapshot'] ?? $campaign['nilai_voucher'] ?? 0)
-            : (float) ($row['amount_snapshot'] ?? $campaign['nilai_voucher'] ?? 0);
-        $campaign['tanggal_mulai'] = $row['issued_at'] ?? ($row['start_date'] ?? null);
-        $campaign['tanggal_berakhir'] = $row['expired_at'] ?? ($row['end_date'] ?? null);
-        $campaign['start_date'] = $campaign['tanggal_mulai'];
-        $campaign['end_date'] = $campaign['tanggal_berakhir'];
-        $campaign['member_voucher_id'] = $row['id'] ?? null;
-        $campaign['status_label'] = $row['voucher_status'] ?? 'OPEN';
+        $campaign_id  = !empty($row['campaign_id']) ? (int) $row['campaign_id'] : null;
+        $amount_snap  = (float) ($row['amount_snapshot'] ?? 0);
+        $percent_snap = (float) ($row['percent_snapshot'] ?? 0);
+        $notes        = (string) ($row['notes'] ?? '');
 
-        return $campaign;
+        if ($campaign_id) {
+            // Campaign-based voucher
+            $c = $this->map_campaign_row($row);
+            $dtype  = $c['tipe_diskon'] === 'persentase' ? 'persentase' : 'nominal';
+            // Prioritas: snapshot dari pos_voucher_issue, fallback ke nilai campaign
+            $dvalue = $dtype === 'persentase'
+                ? ($percent_snap > 0 ? $percent_snap : $c['nilai_voucher'])
+                : ($amount_snap  > 0 ? $amount_snap  : $c['nilai_voucher']);
+
+            $desc = $c['jenis_voucher'] === 'produk'
+                ? ('Gratis: ' . html_escape($row['produk_nama'] ?? 'Produk'))
+                : ($dtype === 'persentase'
+                    ? 'Diskon ' . rtrim(rtrim(number_format($dvalue, 2), '0'), '.') . '%'
+                      . ($c['max_diskon'] > 0 ? ' (max Rp ' . number_format((int) $c['max_diskon'], 0, ',', '.') . ')' : '')
+                    : 'Diskon Rp ' . number_format((int) $dvalue, 0, ',', '.'));
+
+            return array_merge($c, [
+                'kode_voucher'      => $row['voucher_code'] ?? '-',
+                'code'              => $row['voucher_code'] ?? '-',
+                'description'       => $desc,
+                'discount_type'     => $dtype,
+                'discount_value'    => $dvalue,
+                'nilai_voucher'     => $dvalue,
+                'nilai'             => $dvalue,
+                'tanggal_mulai'     => $row['issued_at']  ?? $row['start_date'] ?? null,
+                'tanggal_berakhir'  => $row['expired_at'] ?? $row['end_date']   ?? null,
+                'start_date'        => $row['issued_at']  ?? $row['start_date'] ?? null,
+                'end_date'          => $row['expired_at'] ?? $row['end_date']   ?? null,
+                'member_voucher_id' => $row['id'] ?? null,
+                'status_label'      => $row['voucher_status'] ?? 'OPEN',
+            ]);
+        }
+
+        // Rule-based voucher (campaign_id = NULL) — derive dari snapshots + notes
+        $jenis_voucher = 'voucher';
+        $tipe_diskon   = 'nominal';
+        $nilai         = 0.0;
+        $description   = $notes ?: 'Voucher Reward';
+
+        if ($percent_snap > 0) {
+            $jenis_voucher = 'diskon';
+            $tipe_diskon   = 'persentase';
+            $nilai         = $percent_snap;
+            $description   = 'Diskon ' . rtrim(rtrim(number_format($percent_snap, 2), '0'), '.') . '%';
+        } elseif ($amount_snap > 0) {
+            $jenis_voucher = 'diskon';
+            $tipe_diskon   = 'nominal';
+            $nilai         = $amount_snap;
+            $description   = 'Diskon Rp ' . number_format((int) $amount_snap, 0, ',', '.');
+        } elseif (strpos($notes, 'Gratis:') === 0) {
+            $jenis_voucher = 'produk';
+            $description   = $notes;
+        } elseif (strpos($notes, 'Merchandise:') === 0) {
+            $jenis_voucher = 'voucher';
+            $description   = $notes;
+        }
+
+        return [
+            'id'                => $row['id'] ?? null,
+            'member_voucher_id' => $row['id'] ?? null,
+            'campaign_id'       => null,
+            'kode_voucher'      => $row['voucher_code'] ?? '-',
+            'code'              => $row['voucher_code'] ?? '-',
+            'nama_redeem'       => $notes ?: 'Reward',
+            'campaign_name'     => $notes ?: 'Reward',
+            'description'       => $description,
+            'jenis_voucher'     => $jenis_voucher,
+            'jenis'             => $jenis_voucher,
+            'tipe_diskon'       => $tipe_diskon,
+            'discount_type'     => $tipe_diskon,
+            'nilai_voucher'     => $nilai,
+            'nilai'             => $nilai,
+            'discount_value'    => $nilai,
+            'max_diskon'        => 0,
+            'tanggal_mulai'     => $row['issued_at']  ?? null,
+            'tanggal_berakhir'  => $row['expired_at'] ?? null,
+            'start_date'        => $row['issued_at']  ?? null,
+            'end_date'          => $row['expired_at'] ?? null,
+            'status_label'      => $row['voucher_status'] ?? 'OPEN',
+            'voucher_status'    => $row['voucher_status'] ?? 'OPEN',
+            'produk_nama'       => null,
+            'produk_id'         => null,
+            'notes'             => $notes,
+            'voucher_type'      => null,
+        ];
     }
 
     public function get_by_status($customer_id, $status)

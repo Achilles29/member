@@ -1,5 +1,4 @@
 <?php
-
 defined('BASEPATH') or exit('No direct script access allowed');
 
 class Redeem extends CI_Controller
@@ -9,58 +8,56 @@ class Redeem extends CI_Controller
         parent::__construct();
         $this->load->model('Redeem_model');
         $this->load->model('Member_model');
-        $this->load->helper(['url', 'form', 'text']);
+        $this->load->helper(['url', 'form']);
     }
 
-public function index()
-{
-    $member_id = $this->session->userdata('member_id');
-    if (!$member_id) {
-        redirect('login');
-    }
-
-    $data['member'] = $this->Member_model->get_member_by_id($member_id);
-    $data['poin'] = (int) $this->Member_model->get_active_poin($member_id);
-    $data['stamp'] = $this->Redeem_model->get_active_stamp($member_id);
-
-    $data['redeem_poin']  = $this->Redeem_model->get_all_active_by_type('poin');
-    $data['redeem_stamp'] = $this->Redeem_model->get_all_active_by_type('stamp');
-
-    $data['title'] = "Redeem";
-    $data['active_menu'] = 'redeem';
-
-    $this->load->view('templates/member/header', $data);
-    $this->load->view('member/redeem', $data);
-    $this->load->view('templates/member/footer', $data);
-}
-
-
-    private function generate_kode_voucher($nama_redeem)
+    private function require_login(): int
     {
-        $prefix = strtoupper(preg_replace('/[^A-Z0-9]/', '', substr($nama_redeem, 0, 6)));
-        $random = strtoupper(substr(md5(uniqid(rand(), true)), 0, 6));
-        return $prefix . '-' . $random;
+        $id = (int) $this->session->userdata('member_id');
+        if (!$id) redirect('login');
+        return $id;
     }
 
-
-    public function process($id)
+    public function index()
     {
-        $member_id = $this->session->userdata('member_id');
-        $redeem = $this->Redeem_model->get_setting($id);
+        $member_id = $this->require_login();
 
-        if (!$redeem) {
-            $this->session->set_flashdata('error', 'Redeem tidak ditemukan.');
+        $poin        = $this->Redeem_model->get_poin_aktif($member_id);
+        $stamp_total = $this->Redeem_model->get_stamp_aktif($member_id);
+
+        $data['member']       = $this->Member_model->get_member_by_id($member_id);
+        $data['poin']         = $poin;
+        $data['stamp_total']  = $stamp_total;
+        $data['redeem_poin']  = $this->Redeem_model->get_rules_by_type('poin');
+        $data['redeem_stamp'] = $this->Redeem_model->get_rules_by_type('stamp');
+        $data['title']        = 'Redeem Reward';
+        $data['active_menu']  = 'redeem';
+
+        $this->load->view('templates/member/header', $data);
+        $this->load->view('member/redeem', $data);
+        $this->load->view('templates/member/footer', $data);
+    }
+
+    public function process(int $rule_id = 0)
+    {
+        $member_id = $this->require_login();
+        $rule_id   = (int) $rule_id;
+
+        if ($rule_id <= 0) {
+            $this->session->set_flashdata('error', 'Reward tidak valid.');
             redirect('redeem');
         }
 
-        if (!$this->Redeem_model->process_redeem($member_id, $redeem)) {
-            $this->session->set_flashdata('error', ucfirst($redeem['jenis']) . ' tidak mencukupi.');
+        $result = $this->Redeem_model->process_rule_redeem($member_id, $rule_id);
+
+        if (!$result['ok']) {
+            $this->session->set_flashdata('error', $result['message'] ?? 'Redeem gagal.');
             redirect('redeem');
         }
 
-        $this->session->set_flashdata('success', 'Redeem berhasil! Voucher telah dibuat.');
+        $this->session->set_flashdata('success',
+            $result['message'] ?? ('Redeem berhasil! Voucher kamu: ' . $result['voucher_code'])
+        );
         redirect('redeem');
     }
-
-
 }

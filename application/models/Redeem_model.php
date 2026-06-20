@@ -1,308 +1,385 @@
 <?php
 defined('BASEPATH') or exit('No direct script access allowed');
 
-/**
- * Redeem Model
- * 
- * Model untuk redeem poin/stamp
- * Di database core, tidak ada pr_redeem_setting
- * Menggunakan pos_voucher_campaign sebagai alternatif
- */
 class Redeem_model extends CI_Model
 {
-    protected $table_voucher_campaign = 'pos_voucher_campaign';
-    protected $table_voucher_issue = 'pos_voucher_issue';
-    protected $table_point_ledger = 'pos_point_ledger';
-    protected $table_stamp_ledger = 'pos_stamp_ledger';
-    protected $table_member = 'crm_member';
-
-    private function map_campaign($row)
+    private function get_point_balance(int $member_id): float
     {
-        if (empty($row)) {
-            return null;
+        $row = $this->db->query(
+            'SELECT balance_after FROM pos_point_ledger WHERE member_id = ? ORDER BY id DESC LIMIT 1',
+            [$member_id]
+        )->row_array();
+        if ($row) return (float) $row['balance_after'];
+
+        $m = $this->db->select('point_balance_cache')->get_where('crm_member', ['id' => $member_id])->row_array();
+        return (float) ($m['point_balance_cache'] ?? 0);
+    }
+
+    private function get_stamp_balance(int $member_id): float
+    {
+        $row = $this->db->query(
+            'SELECT balance_after FROM pos_stamp_ledger WHERE member_id = ? ORDER BY id DESC LIMIT 1',
+            [$member_id]
+        )->row_array();
+        if ($row) return (float) $row['balance_after'];
+
+        $m = $this->db->select('stamp_balance_cache')->get_where('crm_member', ['id' => $member_id])->row_array();
+        return (float) ($m['stamp_balance_cache'] ?? 0);
+    }
+
+    public function get_poin_aktif(int $member_id): int
+    {
+        return (int) round($this->get_point_balance($member_id));
+    }
+
+    public function get_stamp_aktif(int $member_id): int
+    {
+        return (int) round($this->get_stamp_balance($member_id));
+    }
+
+    private function map_rule(array $row, string $jenis): array
+    {
+        $reward_type   = strtoupper($row['reward_type'] ?? '');
+        $jenis_voucher = 'lainnya';
+        $tipe_diskon   = 'nominal';
+        $nilai_voucher = 0.0;
+        $max_diskon    = 0.0;
+        $produk_id     = null;
+        $produk_nama   = null;
+
+        if (in_array($reward_type, ['PRODUCT', 'FREE_PRODUCT'], true)) {
+            $jenis_voucher = 'produk';
+            $produk_id     = $row['product_id'] ?? null;
+            $produk_nama   = $row['produk_nama'] ?? null;
+        } elseif ($reward_type === 'DISCOUNT_AMOUNT') {
+            $jenis_voucher = 'diskon';
+            $tipe_diskon   = 'nominal';
+            $nilai_voucher = (float) ($row['discount_amount'] ?? 0);
+        } elseif ($reward_type === 'DISCOUNT_PERCENT') {
+            $jenis_voucher = 'diskon';
+            $tipe_diskon   = 'persentase';
+            $nilai_voucher = (float) ($row['discount_percent'] ?? 0);
+        } elseif ($reward_type === 'VOUCHER') {
+            $jenis_voucher = 'diskon';
+            $vc_type       = strtoupper($row['vc_voucher_type'] ?? '');
+            if ($vc_type === 'PERCENT') {
+                $tipe_diskon   = 'persentase';
+                $nilai_voucher = (float) ($row['vc_discount_value'] ?? 0);
+                $max_diskon    = (float) ($row['vc_max_discount'] ?? 0);
+            } else {
+                $tipe_diskon   = 'nominal';
+                $nilai_voucher = (float) ($row['vc_discount_value'] ?? 0);
+            }
         }
 
-        $is_product = strtoupper((string) ($row['voucher_type'] ?? '')) === 'FREE_PRODUCT';
-        $is_percent = strtoupper((string) ($row['voucher_type'] ?? '')) === 'PERCENT';
-        $is_stamp = (float) ($row['stamp_cost'] ?? 0) > 0;
+        $cost = $jenis === 'stamp'
+            ? (float) ($row['stamp_cost'] ?? 0)
+            : (float) ($row['point_cost'] ?? 0);
 
         return [
-            'id' => (int) $row['id'],
-            'campaign_id' => (int) $row['id'],
-            'campaign_code' => $row['campaign_code'] ?? null,
-            'nama_redeem' => $row['campaign_name'] ?? 'Voucher',
-            'jenis' => $is_stamp ? 'stamp' : 'poin',
-            'jumlah_dibutuhkan' => (int) round($is_stamp ? ($row['stamp_cost'] ?? 0) : ($row['point_cost'] ?? 0)),
-            'jenis_voucher' => $is_product ? 'produk' : 'diskon',
-            'produk_id' => $row['free_product_id'] ?? null,
-            'produk_nama' => $row['produk_nama'] ?? null,
-            'tipe_diskon' => $is_percent ? 'persentase' : 'nominal',
-            'nilai_voucher' => (float) ($row['discount_value'] ?? 0),
-            'max_diskon' => (float) ($row['max_discount_amount'] ?? 0),
-            'valid_day_count' => (int) ($row['valid_day_count'] ?? 0),
-            'end_date' => $row['end_date'] ?? null,
+            'id'                => (int) $row['id'],
+            'nama_redeem'       => $row['rule_name'] ?? 'Reward',
+            'deskripsi'         => $row['description'] ?? '',
+            'jenis'             => $jenis,
+            'cost_type'         => strtoupper($row['cost_type'] ?? 'POINT'),
+            'jumlah_dibutuhkan' => (int) round($cost),
+            'jenis_voucher'     => $jenis_voucher,
+            'tipe_diskon'       => $tipe_diskon,
+            'nilai_voucher'     => $nilai_voucher,
+            'max_diskon'        => $max_diskon,
+            'produk_id'         => $produk_id,
+            'produk_nama'       => $produk_nama,
+            'reward_notes'      => $row['reward_notes'] ?? '',
+            'reward_type'       => $reward_type,
+            'min_spend_amount'  => (float) ($row['min_spend_amount'] ?? 0),
         ];
     }
 
-    private function generate_voucher_issue_no()
+    public function get_rules_by_type(string $jenis): array
     {
-        return 'VI-' . date('YmdHis') . '-' . strtoupper(substr(md5(uniqid((string) mt_rand(), true)), 0, 6));
-    }
-
-    private function generate_voucher_code($campaign_code)
-    {
-        $prefix = strtoupper(substr(preg_replace('/[^A-Z0-9]/', '', (string) $campaign_code), 0, 8));
-        if ($prefix === '') {
-            $prefix = 'VCHR';
+        if (!$this->db->table_exists('pos_redeem_rule')) {
+            return [];
         }
 
-        return $prefix . '-' . strtoupper(substr(md5(uniqid((string) mt_rand(), true)), 0, 6));
-    }
+        $this->db->select('rr.*, mp.product_name AS produk_nama,
+            vc.discount_value AS vc_discount_value, vc.voucher_type AS vc_voucher_type,
+            vc.max_discount_amount AS vc_max_discount');
+        $this->db->from('pos_redeem_rule rr');
+        $this->db->join('mst_product mp', 'mp.id = rr.product_id', 'left');
+        $this->db->join('pos_voucher_campaign vc', 'vc.id = rr.voucher_campaign_id', 'left');
+        $this->db->where('rr.is_active', 1);
 
-    private function get_point_balance($member_id)
-    {
-        $row = $this->db
-            ->select('balance_after')
-            ->where('member_id', $member_id)
-            ->order_by('created_at', 'DESC')
-            ->limit(1)
-            ->get($this->table_point_ledger)
-            ->row();
-
-        if ($row) {
-            return (float) $row->balance_after;
-        }
-
-        $member = $this->db->select('point_balance_cache')->get_where($this->table_member, ['id' => $member_id])->row();
-        return (float) ($member->point_balance_cache ?? 0);
-    }
-
-    private function get_stamp_balance($member_id)
-    {
-        $row = $this->db
-            ->select('balance_after')
-            ->where('member_id', $member_id)
-            ->order_by('created_at', 'DESC')
-            ->limit(1)
-            ->get($this->table_stamp_ledger)
-            ->row();
-
-        if ($row) {
-            return (float) $row->balance_after;
-        }
-
-        $member = $this->db->select('stamp_balance_cache')->get_where($this->table_member, ['id' => $member_id])->row();
-        return (float) ($member->stamp_balance_cache ?? 0);
-    }
-
-    private function sync_member_cache($member_id, $column, $balance)
-    {
-        $this->db->where('id', $member_id)->update($this->table_member, [$column => $balance]);
-    }
-
-    public function get_all_active_by_type($jenis)
-    {
-        $today = date('Y-m-d');
-
-        $this->db->select('vc.*, mp.product_name as produk_nama');
-        $this->db->from($this->table_voucher_campaign . ' vc');
-        $this->db->join('mst_product mp', 'mp.id = vc.free_product_id', 'left');
-        $this->db->where('vc.is_active', 1);
+        // Exclude rules where stock is exhausted
         $this->db->group_start();
-        $this->db->where('vc.start_date IS NULL', null, false);
-        $this->db->or_where('vc.start_date <=', $today);
-        $this->db->group_end();
-        $this->db->group_start();
-        $this->db->where('vc.end_date IS NULL', null, false);
-        $this->db->or_where('vc.end_date >=', $today);
+        $this->db->where('rr.stock_qty IS NULL', null, false);
+        $this->db->or_where('rr.redeemed_count < rr.stock_qty', null, false);
         $this->db->group_end();
 
         if ($jenis === 'stamp') {
-            $this->db->where('vc.stamp_cost >', 0);
+            $this->db->group_start();
+            $this->db->where('rr.cost_type', 'STAMP');
+            $this->db->or_where('rr.cost_type', 'BOTH');
+            $this->db->group_end();
         } else {
-            $this->db->where('vc.point_cost >', 0);
+            $this->db->group_start();
+            $this->db->where('rr.cost_type', 'POINT');
+            $this->db->or_where('rr.cost_type', 'BOTH');
+            $this->db->group_end();
         }
 
-        $this->db->order_by('vc.campaign_name', 'ASC');
+        $this->db->order_by('rr.rule_name', 'ASC');
+        $rows = $this->db->get()->result_array();
 
-        return array_values(array_filter(array_map([$this, 'map_campaign'], $this->db->get()->result_array())));
+        return array_map(function ($row) use ($jenis) {
+            return $this->map_rule($row, $jenis);
+        }, $rows);
     }
 
-    public function get_active_redeem($jenis)
+    public function process_rule_redeem(int $member_id, int $rule_id): array
     {
-        return $this->get_all_active_by_type($jenis);
-    }
-
-    public function get_redeem_by_id($id)
-    {
-        $row = $this->db
-            ->select('vc.*, mp.product_name as produk_nama')
-            ->from($this->table_voucher_campaign . ' vc')
-            ->join('mst_product mp', 'mp.id = vc.free_product_id', 'left')
-            ->where('vc.id', $id)
-            ->where('vc.is_active', 1)
-            ->get()
-            ->row_array();
-
-        return $this->map_campaign($row);
-    }
-
-    public function get_active_stamp($customer_id)
-    {
-        $this->db->select('sl.campaign_id, sc.campaign_name as nama_promo, GREATEST(SUM(sl.stamp_in - sl.stamp_out), 0) as jumlah_stamp, sc.redeem_required_stamp as total_stamp_target, sc.is_active as aktif', false);
-        $this->db->from('pos_stamp_ledger sl');
-        $this->db->join('pos_stamp_campaign sc', 'sl.campaign_id = sc.id');
-        $this->db->where('sl.member_id', $customer_id);
-        $this->db->where('sc.is_active', 1);
-        $this->db->where('(sl.expired_at >= NOW() OR sl.expired_at IS NULL)');
-        $this->db->group_by('sl.campaign_id');
-        $this->db->having('jumlah_stamp >', 0);
-        $this->db->order_by('sl.created_at', 'desc');
-        return $this->db->get()->result_array();
-    }
-
-    public function get_active_redeem_by_type($customer_id, $jenis)
-    {
-        return $this->get_all_active_by_type($jenis);
-    }
-
-    public function process_redeem($customer_id, $redeem)
-    {
-        if (empty($redeem)) {
-            return false;
+        if (!$this->db->table_exists('pos_redeem_rule')) {
+            return ['ok' => false, 'message' => 'Fitur redeem rule belum tersedia.'];
         }
 
+        $prev_debug = $this->db->db_debug;
+        $this->db->db_debug = false;
         $this->db->trans_begin();
 
-        $redeem_row = is_array($redeem) ? $redeem : $this->get_redeem_by_id((int) $redeem);
-        if (empty($redeem_row)) {
-            $this->db->trans_rollback();
-            return false;
-        }
-
-        $ok = $this->potong_saldo($customer_id, $redeem_row);
-        if (!$ok) {
-            $this->db->trans_rollback();
-            return false;
-        }
-
-        $voucher_id = $this->simpan_voucher($customer_id, $redeem_row);
-        if (!$voucher_id) {
-            $this->db->trans_rollback();
-            return false;
-        }
-
-        $this->log_redeem($customer_id, $redeem_row, $voucher_id);
-
-        if ($this->db->trans_status() === false) {
-            $this->db->trans_rollback();
-            return false;
-        }
-
-        $this->db->trans_commit();
-        return true;
-    }
-
-    public function get_poin_aktif($customer_id)
-    {
-        return (int) round($this->get_point_balance($customer_id));
-    }
-
-    public function get_setting($id)
-    {
-        return $this->get_redeem_by_id($id);
-    }
-
-    public function potong_saldo($member_id, $redeem)
-    {
-        if (($redeem['jenis'] ?? 'poin') === 'stamp') {
-            $need = (float) ($redeem['jumlah_dibutuhkan'] ?? 0);
-            $balance = $this->get_stamp_balance($member_id);
-            if ($balance < $need || $need <= 0) {
-                return false;
+        try {
+            // 1. Load & validate rule
+            $rule = $this->db->from('pos_redeem_rule')
+                ->where('id', $rule_id)->where('is_active', 1)->limit(1)
+                ->get()->row_array();
+            if (!$rule) {
+                throw new RuntimeException('Reward tidak ditemukan atau sudah tidak aktif.');
             }
 
-            $new_balance = $balance - $need;
-            $ok = $this->db->insert($this->table_stamp_ledger, [
-                'member_id' => $member_id,
-                'campaign_id' => $redeem['campaign_id'] ?? null,
-                'ledger_type' => 'REDEEM',
-                'stamp_in' => 0,
-                'stamp_out' => $need,
-                'balance_after' => $new_balance,
-                'notes' => 'Redeem voucher: ' . ($redeem['nama_redeem'] ?? 'Voucher'),
-                'created_at' => date('Y-m-d H:i:s'),
-            ]);
-
-            if ($ok) {
-                $this->sync_member_cache($member_id, 'stamp_balance_cache', $new_balance);
+            // 2. Stock check
+            if ($rule['stock_qty'] !== null && (int) $rule['stock_qty'] <= (int) ($rule['redeemed_count'] ?? 0)) {
+                throw new RuntimeException('Stok reward sudah habis.');
             }
 
-            return $ok;
+            // 3. Validity check (valid_days dihitung dari created_at)
+            if (!empty($rule['valid_days'])) {
+                $expiry = strtotime((string) $rule['created_at']) + ((int) $rule['valid_days'] * 86400);
+                if (time() > $expiry) {
+                    throw new RuntimeException('Reward ini sudah kadaluarsa.');
+                }
+            }
+
+            // 4. Lock member row & baca saldo terkini dari ledger
+            $member = $this->db->query(
+                'SELECT * FROM crm_member WHERE id = ? FOR UPDATE',
+                [$member_id]
+            )->row_array();
+            if (!$member) {
+                throw new RuntimeException('Member tidak ditemukan.');
+            }
+
+            $point_bal = $this->get_point_balance($member_id);
+            $stamp_bal = $this->get_stamp_balance($member_id);
+            $cost_type = strtoupper($rule['cost_type'] ?? 'POINT');
+            $now       = date('Y-m-d H:i:s');
+            $ledger_note = $rule['rule_name'];
+
+            $point_ledger_id = null;
+            $stamp_ledger_id = null;
+
+            // 5. Potong poin
+            if ($cost_type === 'POINT' || $cost_type === 'BOTH') {
+                $cost = (float) ($rule['point_cost'] ?? 0);
+                if ($cost <= 0) {
+                    throw new RuntimeException('Biaya poin tidak valid.');
+                }
+                if ($point_bal < $cost - 0.0001) {
+                    throw new RuntimeException(sprintf(
+                        'Poin tidak cukup. Butuh %s poin, saldo kamu %s poin.',
+                        number_format($cost, 0, ',', '.'),
+                        number_format($point_bal, 0, ',', '.')
+                    ));
+                }
+                $point_after = round($point_bal - $cost, 4);
+                $this->db->insert('pos_point_ledger', [
+                    'member_id'     => $member_id,
+                    'order_id'      => null,
+                    'payment_id'    => null,
+                    'rule_id'       => null,
+                    'ledger_type'   => 'REDEEM',
+                    'points_in'     => 0,
+                    'points_out'    => $cost,
+                    'balance_after' => $point_after,
+                    'notes'         => $ledger_note,
+                    'created_at'    => $now,
+                ]);
+                $point_ledger_id = (int) $this->db->insert_id();
+                $this->db->where('id', $member_id)->update('crm_member', ['point_balance_cache' => $point_after]);
+                $point_bal = $point_after;
+            }
+
+            // 6. Potong stamp
+            if ($cost_type === 'STAMP' || $cost_type === 'BOTH') {
+                $cost    = (float) ($rule['stamp_cost'] ?? 0);
+                $camp_id = !empty($rule['stamp_campaign_id']) ? (int) $rule['stamp_campaign_id'] : null;
+                if ($cost <= 0) {
+                    throw new RuntimeException('Biaya stamp tidak valid.');
+                }
+                if ($stamp_bal < $cost - 0.0001) {
+                    throw new RuntimeException(sprintf(
+                        'Stamp tidak cukup. Butuh %s stamp, saldo kamu %s stamp.',
+                        number_format($cost, 0, ',', '.'),
+                        number_format($stamp_bal, 0, ',', '.')
+                    ));
+                }
+                $stamp_after = round($stamp_bal - $cost, 4);
+                $this->db->insert('pos_stamp_ledger', [
+                    'member_id'     => $member_id,
+                    'order_id'      => null,
+                    'payment_id'    => null,
+                    'campaign_id'   => $camp_id,
+                    'ledger_type'   => 'REDEEM',
+                    'stamp_in'      => 0,
+                    'stamp_out'     => $cost,
+                    'balance_after' => $stamp_after,
+                    'notes'         => $ledger_note,
+                    'created_at'    => $now,
+                ]);
+                $stamp_ledger_id = (int) $this->db->insert_id();
+                $this->db->where('id', $member_id)->update('crm_member', ['stamp_balance_cache' => $stamp_after]);
+                $stamp_bal = $stamp_after;
+            }
+
+            // 7. Buat pos_voucher_issue
+            $voucher_code = 'VR-' . date('Ymd') . '-' . strtoupper(substr(md5(uniqid('', true)), 0, 8));
+            $reward_type  = strtoupper($rule['reward_type'] ?? '');
+            $expired_at   = !empty($rule['valid_days'])
+                ? date('Y-m-d H:i:s', strtotime('+' . (int) $rule['valid_days'] . ' days'))
+                : null;
+
+            $voucher_row = [
+                'campaign_id'      => null,
+                'redeem_rule_id'   => $rule_id,
+                'member_id'        => $member_id,
+                'voucher_issue_no' => $voucher_code,
+                'voucher_code'     => $voucher_code,
+                'voucher_status'   => 'OPEN',
+                'amount_snapshot'  => 0,
+                'percent_snapshot' => 0,
+                'min_spend_amount' => $rule['min_spend_amount'] ?? null,
+                'issued_at'        => $now,
+                'expired_at'       => $expired_at,
+                'notes'            => $rule['rule_name'],
+                'created_at'       => $now,
+            ];
+
+            if ($reward_type === 'VOUCHER' && !empty($rule['voucher_campaign_id'])) {
+                $vc = $this->db->query(
+                    'SELECT * FROM pos_voucher_campaign WHERE id = ? AND is_active = 1 LIMIT 1',
+                    [$rule['voucher_campaign_id']]
+                )->row_array();
+                if ($vc) {
+                    $voucher_row['campaign_id']     = (int) $vc['id'];
+                    $voucher_row['amount_snapshot'] = (float) ($vc['discount_value'] ?? 0);
+                }
+            } elseif ($reward_type === 'DISCOUNT_AMOUNT') {
+                $voucher_row['amount_snapshot'] = (float) ($rule['discount_amount'] ?? 0);
+            } elseif ($reward_type === 'DISCOUNT_PERCENT') {
+                $voucher_row['percent_snapshot'] = (float) ($rule['discount_percent'] ?? 0);
+            } elseif (in_array($reward_type, ['PRODUCT', 'FREE_PRODUCT'], true)) {
+                $prod_name = '';
+                if (!empty($rule['product_id'])) {
+                    $prod = $this->db->query(
+                        'SELECT product_name FROM mst_product WHERE id = ? LIMIT 1',
+                        [$rule['product_id']]
+                    )->row_array();
+                    $prod_name = $prod['product_name'] ?? '';
+                }
+                $qty = !empty($rule['product_qty']) ? (float) $rule['product_qty'] : 1;
+                $voucher_row['notes'] = 'Gratis: ' . ($prod_name ?: $rule['rule_name'])
+                    . ($qty != 1 ? ' x' . rtrim(rtrim(number_format($qty, 2), '0'), '.') : '');
+            } elseif ($reward_type === 'MERCHANDISE') {
+                $voucher_row['notes'] = 'Merchandise: ' . ($rule['reward_notes'] ?: $rule['rule_name']);
+            } else {
+                $voucher_row['notes'] = $rule['reward_notes'] ?: $rule['rule_name'];
+            }
+
+            // Hanya insert kolom redeem_rule_id jika kolom sudah ada
+            if (!$this->db->field_exists('redeem_rule_id', 'pos_voucher_issue')) {
+                unset($voucher_row['redeem_rule_id']);
+            }
+            if (!$this->db->field_exists('min_spend_amount', 'pos_voucher_issue')) {
+                unset($voucher_row['min_spend_amount']);
+            }
+
+            $this->db->insert('pos_voucher_issue', $voucher_row);
+            $voucher_issue_id = (int) $this->db->insert_id();
+
+            // 8. Log ke pos_redeem_transaction
+            if ($this->db->table_exists('pos_redeem_transaction')) {
+                $redeem_no   = 'RDM-' . date('Ymd') . '-' . strtoupper(substr(md5(uniqid('', true)), 0, 6));
+                $redeem_type = ($cost_type === 'BOTH' || $cost_type === 'POINT') ? 'POINT' : 'STAMP';
+
+                $tx_row = [
+                    'redeem_no'        => $redeem_no,
+                    'member_id'        => $member_id,
+                    'redeem_type'      => $redeem_type,
+                    'point_ledger_id'  => $point_ledger_id,
+                    'points_used'      => $point_ledger_id ? (float) ($rule['point_cost'] ?? 0) : null,
+                    'stamp_ledger_id'  => $stamp_ledger_id,
+                    'stamps_used'      => $stamp_ledger_id ? (float) ($rule['stamp_cost'] ?? 0) : null,
+                    'voucher_issue_id' => $voucher_issue_id,
+                    'voucher_code'     => $voucher_code,
+                    'reward_type'      => 'CUSTOM',
+                    'reward_desc'      => $rule['rule_name'],
+                    'reward_amount'    => $rule['discount_amount'] ?? $rule['discount_percent'] ?? null,
+                    'notes'            => null,
+                    'redeemed_by'      => null,
+                    'created_at'       => $now,
+                ];
+                if ($this->db->field_exists('rule_id', 'pos_redeem_transaction')) {
+                    $tx_row['rule_id'] = $rule_id;
+                }
+                $this->db->insert('pos_redeem_transaction', $tx_row);
+            }
+
+            // 9. Naikkan redeemed_count
+            $this->db->query(
+                'UPDATE pos_redeem_rule SET redeemed_count = redeemed_count + 1 WHERE id = ?',
+                [$rule_id]
+            );
+
+            if ($this->db->trans_status() === false) {
+                $err = $this->db->error();
+                throw new RuntimeException($err['message'] ?: 'Gagal memproses redeem.');
+            }
+
+            $this->db->trans_commit();
+            $this->db->db_debug = $prev_debug;
+
+            // Bangun deskripsi voucher
+            $desc = $voucher_row['notes'];
+            if ($reward_type === 'DISCOUNT_AMOUNT' && ($voucher_row['amount_snapshot'] ?? 0) > 0) {
+                $desc = 'Diskon Rp ' . number_format($voucher_row['amount_snapshot'], 0, ',', '.');
+                if (!empty($rule['min_spend_amount'])) {
+                    $desc .= ' (min. belanja Rp ' . number_format((float) $rule['min_spend_amount'], 0, ',', '.') . ')';
+                }
+            } elseif ($reward_type === 'DISCOUNT_PERCENT' && ($voucher_row['percent_snapshot'] ?? 0) > 0) {
+                $desc = 'Diskon ' . rtrim(rtrim(number_format($voucher_row['percent_snapshot'], 2), '0'), '.') . '%';
+                if (!empty($rule['min_spend_amount'])) {
+                    $desc .= ' (min. belanja Rp ' . number_format((float) $rule['min_spend_amount'], 0, ',', '.') . ')';
+                }
+            }
+
+            return [
+                'ok'           => true,
+                'voucher_code' => $voucher_code,
+                'voucher_desc' => $desc,
+                'message'      => 'Redeem berhasil! Kode voucher: ' . $voucher_code,
+            ];
+
+        } catch (Throwable $e) {
+            $this->db->trans_rollback();
+            $this->db->db_debug = $prev_debug;
+            return ['ok' => false, 'message' => $e->getMessage()];
         }
-
-        $need = (float) ($redeem['jumlah_dibutuhkan'] ?? 0);
-        $balance = $this->get_point_balance($member_id);
-        if ($balance < $need || $need <= 0) {
-            return false;
-        }
-
-        $new_balance = $balance - $need;
-        $ok = $this->db->insert($this->table_point_ledger, [
-            'member_id' => $member_id,
-            'ledger_type' => 'REDEEM',
-            'points_in' => 0,
-            'points_out' => $need,
-            'balance_after' => $new_balance,
-            'notes' => 'Redeem voucher: ' . ($redeem['nama_redeem'] ?? 'Voucher'),
-            'created_at' => date('Y-m-d H:i:s'),
-        ]);
-
-        if ($ok) {
-            $this->sync_member_cache($member_id, 'point_balance_cache', $new_balance);
-        }
-
-        return $ok;
-    }
-
-    public function simpan_voucher($member_id, $redeem)
-    {
-        $expired_at = null;
-        if (!empty($redeem['valid_day_count'])) {
-            $expired_at = date('Y-m-d H:i:s', strtotime('+' . (int) $redeem['valid_day_count'] . ' days'));
-        } elseif (!empty($redeem['end_date'])) {
-            $expired_at = $redeem['end_date'] . ' 23:59:59';
-        }
-
-        $campaign = $this->db->get_where($this->table_voucher_campaign, ['id' => $redeem['campaign_id']])->row_array();
-        if (!$campaign) {
-            return false;
-        }
-
-        $data = [
-            'voucher_issue_no' => $this->generate_voucher_issue_no(),
-            'campaign_id' => $redeem['campaign_id'],
-            'member_id' => $member_id,
-            'voucher_code' => $this->generate_voucher_code($campaign['campaign_code'] ?? ''),
-            'voucher_status' => 'OPEN',
-            'amount_snapshot' => strtoupper((string) ($campaign['voucher_type'] ?? '')) === 'PERCENT' ? 0 : (float) ($campaign['discount_value'] ?? 0),
-            'percent_snapshot' => strtoupper((string) ($campaign['voucher_type'] ?? '')) === 'PERCENT' ? (float) ($campaign['discount_value'] ?? 0) : 0,
-            'issued_at' => date('Y-m-d H:i:s'),
-            'expired_at' => $expired_at,
-            'notes' => 'Redeem via member app',
-            'created_at' => date('Y-m-d H:i:s'),
-        ];
-
-        $ok = $this->db->insert($this->table_voucher_issue, $data);
-        if (!$ok) {
-            return false;
-        }
-
-        return (int) $this->db->insert_id();
-    }
-
-    public function log_redeem($member_id, $redeem, $voucher_id)
-    {
-        return true;
     }
 }

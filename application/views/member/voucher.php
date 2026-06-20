@@ -1,3 +1,17 @@
+<?php
+function nm_ticket_badge(array $v): string {
+  $j = $v['jenis_voucher'] ?? $v['jenis'] ?? '';
+  if ($j === 'produk') return '<span class="nm-badge neutral">Produk</span>';
+  if ($j === 'diskon')  return '<span class="nm-badge success">Diskon</span>';
+  return '<span class="nm-badge neutral">Reward</span>';
+}
+function nm_ticket_icon(array $v): string {
+  $j = $v['jenis_voucher'] ?? $v['jenis'] ?? '';
+  if ($j === 'produk') return '🛍️';
+  if ($j === 'diskon')  return '🏷️';
+  return '🎁';
+}
+?>
 <div class="page-content nm-page">
 
   <div class="nm-page-hero nm-page-hero--voucher">
@@ -13,7 +27,6 @@
     </div>
   </div>
 
-  <!-- TABS -->
   <div class="nm-vtabs">
     <a class="nm-vtab is-active" href="<?= site_url('voucher') ?>">
       Aktif <span class="nm-vtab-badge"><?= is_array($voucher_aktif ?? null) ? count($voucher_aktif) : 0 ?></span>
@@ -29,36 +42,23 @@
   <?php if (!empty($voucher_aktif)): ?>
     <?php foreach ($voucher_aktif as $v): ?>
       <?php
-        $kode  = html_escape($v['kode_voucher'] ?? '-');
-        $jenis = $v['jenis'] ?? '';
-        $mulai = !empty($v['tanggal_mulai']) ? date('d M Y', strtotime($v['tanggal_mulai'])) : '-';
+        $kode  = $v['kode_voucher'] ?? '-';
+        $mulai = !empty($v['tanggal_mulai'])    ? date('d M Y', strtotime($v['tanggal_mulai']))    : '-';
         $akhir = !empty($v['tanggal_berakhir']) ? date('d M Y', strtotime($v['tanggal_berakhir'])) : '-';
-        if ($jenis === 'produk') {
-          $desc  = 'Gratis: ' . html_escape($v['produk_nama'] ?? 'Produk');
-          $badge = 'Produk'; $bclass = 'neutral';
-        } elseif ($jenis === 'diskon') {
-          $badge = 'Diskon'; $bclass = 'success';
-          if (isset($v['tipe_diskon']) && $v['tipe_diskon'] === 'persentase') {
-            $max  = number_format($v['max_diskon'] ?? 0, 0, ',', '.');
-            $desc = 'Diskon ' . (int)$v['nilai'] . '% (max Rp' . $max . ')';
-          } else {
-            $desc = 'Diskon Rp' . number_format((int)$v['nilai'], 0, ',', '.');
-          }
-        } else { $desc = 'Voucher'; $badge = 'Aktif'; $bclass = 'neutral'; }
+        $desc  = $v['description'] ?? '-';
       ?>
       <div class="nm-ticket nm-ticket--active">
         <div class="nm-ticket__left">
-          <div class="nm-ticket__badge-wrap"><span class="nm-badge success">Aktif</span></div>
-          <div class="nm-ticket__icon">🎟</div>
-          <span class="nm-badge neutral" style="margin-top:4px;"><?= html_escape($badge) ?></span>
+          <span class="nm-badge success">Aktif</span>
+          <div class="nm-ticket__lico"><?= nm_ticket_icon($v) ?></div>
+          <?= nm_ticket_badge($v) ?>
         </div>
-        <div class="nm-ticket__sep"></div>
+        <div class="nm-ticket__vline"></div>
         <div class="nm-ticket__body">
-          <div class="nm-ticket__code"><?= $kode ?></div>
+          <div class="nm-ticket__code"><?= html_escape($kode) ?></div>
           <div class="nm-ticket__desc"><?= $desc ?></div>
           <div class="nm-ticket__date">
-            <i class="f7-icons" style="font-size:12px;">calendar</i>
-            <?= $mulai ?> – <?= $akhir ?>
+            <i class="f7-icons">calendar</i><?= $mulai ?> – <?= $akhir ?>
           </div>
         </div>
       </div>
