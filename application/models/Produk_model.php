@@ -30,10 +30,7 @@ class Produk_model extends CI_Model {
         if ($hasSelfOrderFlag) {
             $this->db->where('p.show_in_self_order', 1);
         } else {
-            $this->db->group_start();
             $this->db->where('p.show_member', 1);
-            $this->db->or_where('p.show_pos', 1);
-            $this->db->group_end();
         }
     }
 

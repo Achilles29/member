@@ -584,15 +584,18 @@
       if (elCatBackdrop) elCatBackdrop.addEventListener('click', closeCatSheet);
 
       // Scroll to section helper
+      const stickyHead = document.querySelector('.nm-order__stickyhead');
       const scrollToSection = (sec) => {
         if (!sec) return;
         const doScroll = () => {
           if (scrollContainer && typeof scrollContainer.scrollTo === 'function') {
+            // Account for sticky header so the section title is not hidden behind it.
+            const stickyH = stickyHead ? stickyHead.offsetHeight : 0;
             const containerTop = scrollContainer.getBoundingClientRect ? scrollContainer.getBoundingClientRect().top : 0;
             const secTop = sec.getBoundingClientRect ? sec.getBoundingClientRect().top : 0;
             const currentTop = scrollContainer.scrollTop || 0;
-            const targetTop = currentTop + (secTop - containerTop) - 10;
-            scrollContainer.scrollTo({ top: targetTop, behavior: 'smooth' });
+            const targetTop = currentTop + (secTop - containerTop) - stickyH - 8;
+            scrollContainer.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
           } else {
             sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
           }

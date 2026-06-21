@@ -333,10 +333,7 @@ class Order extends CI_Controller
         if ($this->db->field_exists('show_in_self_order', 'mst_product')) {
             $this->db->where('p.show_in_self_order', 1);
         } else {
-            $this->db->group_start()
-                ->where('p.show_member', 1)
-                ->or_where('p.show_pos', 1)
-                ->group_end();
+            $this->db->where('p.show_member', 1);
         }
 
         return $this->db->limit(1)->get()->row();
