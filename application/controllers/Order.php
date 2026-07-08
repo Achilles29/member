@@ -869,9 +869,20 @@ class Order extends CI_Controller
             }
 
             if ((int) ($produk->is_available_for_order ?? 0) !== 1) {
+                $reason = trim((string) ($produk->bottleneck_name ?? ''));
+                $suffix = $reason !== '' ? ' Penyebab: ' . $reason . '.' : '';
                 return [
                     'ok' => false,
-                    'message' => 'Menu ' . (string) ($produk->nama_produk ?? 'ini') . ' sedang habis. Silakan hapus dari keranjang lalu pilih menu lain.'
+                    'message' => 'Menu ' . (string) ($produk->nama_produk ?? 'ini') . ' sedang habis.' . $suffix . ' Silakan hapus dari keranjang lalu pilih menu lain.'
+                ];
+            }
+
+            $requestedQty = max(0, (int) ($row['jumlah'] ?? 0));
+            $availableQty = (float) ($produk->stok_tersedia ?? 0);
+            if ($requestedQty > 0 && $availableQty > 0 && $requestedQty > floor($availableQty)) {
+                return [
+                    'ok' => false,
+                    'message' => 'Stok menu ' . (string) ($produk->nama_produk ?? 'ini') . ' hanya cukup untuk ' . (int) floor($availableQty) . ' porsi. Silakan kurangi jumlahnya.'
                 ];
             }
         }

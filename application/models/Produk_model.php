@@ -17,11 +17,11 @@ class Produk_model extends CI_Model {
 
         $availabilitySub = '(
             SELECT
-                pac.product_id,
-                MAX(CASE WHEN pac.availability_status IN ("AVAILABLE", "LIMITED") THEN pac.estimated_available_qty ELSE 0 END) AS estimated_available_qty,
-                MAX(pac.availability_status) AS availability_status
-            FROM pos_product_availability_cache pac
-            GROUP BY pac.product_id
+                NULL AS product_id,
+                0 AS estimated_available_qty,
+                "OUT" AS availability_status,
+                "" AS bottleneck_name_snapshot
+            WHERE 1 = 0
         ) pac';
         $this->db->join($availabilitySub, 'pac.product_id = p.id', 'left', false);
     }
@@ -44,15 +44,12 @@ class Produk_model extends CI_Model {
             c.product_division_id AS pr_divisi_id,
             p.stock_mode,
             COALESCE(pac.availability_status, "OUT") AS availability_status,
+            COALESCE(pac.bottleneck_name_snapshot, "") AS bottleneck_name,
             CASE
-                WHEN UPPER(COALESCE(p.stock_mode, "AUTO")) = "MANUAL_AVAILABLE" THEN 999999
-                WHEN UPPER(COALESCE(p.stock_mode, "AUTO")) = "MANUAL_OUT" THEN 0
                 WHEN COALESCE(pac.availability_status, "OUT") IN ("AVAILABLE", "LIMITED") THEN COALESCE(pac.estimated_available_qty, 0)
                 ELSE 0
             END AS stok_tersedia,
             CASE
-                WHEN UPPER(COALESCE(p.stock_mode, "AUTO")) = "MANUAL_AVAILABLE" THEN 1
-                WHEN UPPER(COALESCE(p.stock_mode, "AUTO")) = "MANUAL_OUT" THEN 0
                 WHEN COALESCE(pac.availability_status, "OUT") IN ("AVAILABLE", "LIMITED")
                      AND COALESCE(pac.estimated_available_qty, 0) > 0 THEN 1
                 ELSE 0

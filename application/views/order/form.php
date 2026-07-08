@@ -448,13 +448,22 @@
     const saveServer = async (forceStep) => {
       const payload = { cart: toServerCart(), step: forceStep || step };
       try {
-        await fetch(BASE_URL + 'order/save_cart', {
+        const res = await fetch(BASE_URL + 'order/save_cart', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
           credentials: 'same-origin',
         });
-      } catch (_) {}
+        const json = await res.json().catch(() => null);
+        if (!res.ok || !json || json.ok === false) {
+          alert((json && json.message) ? json.message : 'Keranjang belum bisa disimpan. Silakan cek pilihan menu lalu coba lagi.');
+          return false;
+        }
+        return true;
+      } catch (_) {
+        alert('Koneksi ke server order belum stabil. Silakan coba lagi.');
+        return false;
+      }
     };
 
     const renderCartBar = () => {
@@ -907,7 +916,13 @@
       step = 'menu';
       saveLocal();
       renderCartBar();
-      await saveServer('menu');
+      const saved = await saveServer('menu');
+      if (!saved) {
+        delete cart[String(currentProduk.id)];
+        saveLocal();
+        renderCartBar();
+        return;
+      }
       closePopup();
       // Jangan langsung buka keranjang setelah tambah item:
       // biar user tetap di daftar menu dan bisa pilih item lain.
@@ -926,6 +941,7 @@
       const k = btn.getAttribute('data-key');
       if (!k || !cart[k]) return;
 
+      const beforeCart = JSON.parse(JSON.stringify(cart));
       if (act === 'plus') cart[k].jumlah += 1;
       if (act === 'minus') cart[k].jumlah = Math.max(1, cart[k].jumlah - 1);
       if (act === 'del') delete cart[k];
@@ -933,7 +949,12 @@
       step = 'menu';
       saveLocal();
       renderCartSheet();
-      await saveServer('menu');
+      const saved = await saveServer('menu');
+      if (!saved) {
+        cart = beforeCart;
+        saveLocal();
+        renderCartSheet();
+      }
     });
 
     document.getElementById('nmClearCart').addEventListener('click', async () => {
@@ -949,7 +970,8 @@
       if (Object.keys(cart).length === 0) return;
       step = 'review';
       saveLocal();
-      await saveServer('review');
+      const saved = await saveServer('review');
+      if (!saved) return;
       window.location.href = BASE_URL + 'order/review_session';
     });
 
