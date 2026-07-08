@@ -46,10 +46,14 @@ class Produk_model extends CI_Model {
             COALESCE(pac.availability_status, "OUT") AS availability_status,
             COALESCE(pac.bottleneck_name_snapshot, "") AS bottleneck_name,
             CASE
+                WHEN UPPER(COALESCE(p.stock_mode, "AUTO")) = "MANUAL_AVAILABLE" THEN 999999
+                WHEN UPPER(COALESCE(p.stock_mode, "AUTO")) = "MANUAL_OUT" THEN 0
                 WHEN COALESCE(pac.availability_status, "OUT") IN ("AVAILABLE", "LIMITED") THEN COALESCE(pac.estimated_available_qty, 0)
                 ELSE 0
             END AS stok_tersedia,
             CASE
+                WHEN UPPER(COALESCE(p.stock_mode, "AUTO")) = "MANUAL_AVAILABLE" THEN 1
+                WHEN UPPER(COALESCE(p.stock_mode, "AUTO")) = "MANUAL_OUT" THEN 0
                 WHEN COALESCE(pac.availability_status, "OUT") IN ("AVAILABLE", "LIMITED")
                      AND COALESCE(pac.estimated_available_qty, 0) > 0 THEN 1
                 ELSE 0

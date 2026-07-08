@@ -6,7 +6,7 @@
             $is_auto_stock = ($stock_mode === 'AUTO');
             $has_photo = !empty($p->foto);
             $is_habis = ($stok_tersedia <= 0) || (int) ($p->is_available_for_order ?? 0) !== 1;
-            $show_sold_out_badge = $is_auto_stock && $is_habis;
+            $show_sold_out_badge = $is_habis;
             $show_limited_badge = $is_auto_stock && !$is_habis && $stok_tersedia > 0 && $stok_tersedia < 5;
         ?>
         <div class="col-6 col-sm-6 col-md-6 mb-3 px-2">
