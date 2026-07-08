@@ -85,35 +85,66 @@
           <?php foreach (($produk_per_kategori[$kat->id] ?? []) as $p): ?>
             <?php
               $stok_tersedia = (float) ($p->stok_tersedia ?? 0);
-              $is_habis = ($stok_tersedia <= 0);
+              $stock_mode = strtoupper(trim((string) ($p->stock_mode ?? 'AUTO')));
+              $is_auto_stock = ($stock_mode === 'AUTO');
+              $has_photo = !empty($p->foto);
+              $is_habis = ($stok_tersedia <= 0) || (int) ($p->is_available_for_order ?? 0) !== 1;
+              $show_sold_out_badge = $is_auto_stock && $is_habis;
+              $show_limited_badge = $is_auto_stock && !$is_habis && $stok_tersedia > 0 && $stok_tersedia < 5;
             ?>
             <button
               type="button"
-              class="nm-order__item <?= $is_habis ? 'is-disabled' : '' ?>"
+              class="nm-order__item <?= $is_habis ? 'is-disabled' : '' ?> <?= !$has_photo ? 'nm-order__item--textOnly' : '' ?>"
               data-produk-id="<?= (int) $p->id ?>"
               data-produk-nama="<?= html_escape($p->nama_produk) ?>"
               data-produk-harga="<?= (float) $p->harga_jual ?>"
+              data-produk-deskripsi="<?= html_escape(trim((string) ($p->deskripsi ?? ''))) ?>"
               data-produk-foto="<?= html_escape((string) ($p->foto ?? '')) ?>"
               <?= $is_habis ? 'disabled aria-disabled="true"' : '' ?>
             >
+              <?php if ($has_photo): ?>
               <div class="nm-order__imgWrap">
-                <?php if (!empty($p->foto)): ?>
                 <img
                   loading="lazy"
                   src="<?= product_url($p->foto) ?>"
                   alt="<?= html_escape($p->nama_produk) ?>"
                   onerror="this.onerror=null;this.style.display='none';"
                 >
-                <?php endif; ?>
-                <?php if ($is_habis): ?>
-                  <div class="nm-order__badge nm-order__badge--habis">HABIS</div>
+                <?php if ($show_sold_out_badge): ?>
+                  <div class="nm-order__badge nm-order__badge--habis">Sold Out</div>
+                <?php elseif ($show_limited_badge): ?>
+                  <div class="nm-order__badge nm-order__badge--limited">Limited</div>
+                <?php elseif ($is_habis): ?>
+                  <div class="nm-order__badge nm-order__badge--habis">Habis</div>
                 <?php else: ?>
                   <div class="nm-order__fab" aria-hidden="true"><i class="f7-icons">plus</i></div>
                 <?php endif; ?>
               </div>
+              <?php endif; ?>
               <div class="nm-order__meta">
-                <div class="nm-order__name"><?= html_escape($p->nama_produk) ?></div>
-                <div class="nm-order__price">Rp <?= number_format((float) $p->harga_jual, 0, ',', '.') ?></div>
+                <div class="nm-order__metaTop">
+                  <div>
+                    <div class="nm-order__name"><?= html_escape($p->nama_produk) ?></div>
+                    <?php if (!$has_photo && trim((string) ($p->deskripsi ?? '')) !== ''): ?>
+                      <div class="nm-order__desc"><?= html_escape($p->deskripsi) ?></div>
+                    <?php endif; ?>
+                  </div>
+                  <?php if (!$has_photo && !$is_habis): ?>
+                    <div class="nm-order__listFab" aria-hidden="true"><i class="f7-icons">plus</i></div>
+                  <?php endif; ?>
+                </div>
+                <div class="nm-order__metaBottom">
+                  <div class="nm-order__price">Rp <?= number_format((float) $p->harga_jual, 0, ',', '.') ?></div>
+                  <?php if (!$has_photo): ?>
+                    <?php if ($show_sold_out_badge): ?>
+                      <div class="nm-order__textBadge nm-order__textBadge--habis">Sold Out</div>
+                    <?php elseif ($show_limited_badge): ?>
+                      <div class="nm-order__textBadge nm-order__textBadge--limited">Limited</div>
+                    <?php elseif ($is_habis): ?>
+                      <div class="nm-order__textBadge nm-order__textBadge--habis">Habis</div>
+                    <?php endif; ?>
+                  <?php endif; ?>
+                </div>
               </div>
             </button>
           <?php endforeach; ?>
@@ -183,6 +214,7 @@
       </div>
 
       <div class="nm-popup__body">
+        <div class="nm-popup__desc" id="nmPopDesc" hidden></div>
         <div class="nm-popup__row">
           <span>Jumlah</span>
           <div class="nm-stepper">
@@ -202,6 +234,11 @@
         <div class="nm-popup__extras" id="nmExtrasWrap" hidden>
           <div class="nm-popup__extrasHead">Extra</div>
           <div class="nm-popup__extrasList" id="nmExtrasList"></div>
+        </div>
+
+        <div class="nm-popup__note">
+          <label class="nm-popup__noteLabel" for="nmItemNote">Catatan</label>
+          <textarea id="nmItemNote" class="nm-popup__noteInput" rows="3" placeholder="Contoh: tanpa sambal, nasi dipisah, atau level pedas."></textarea>
         </div>
       </div>
 
@@ -289,11 +326,13 @@
     const elPopupBackdrop = document.getElementById('nmPopupBackdrop');
     const elPopName = document.getElementById('nmPopName');
     const elPopPrice = document.getElementById('nmPopPrice');
+    const elPopDesc = document.getElementById('nmPopDesc');
     const elQty = document.getElementById('nmQty');
     const elExtrasWrap = document.getElementById('nmExtrasWrap');
     const elToggleExtras = document.getElementById('nmToggleExtras');
     const elToggleExtrasText = document.getElementById('nmToggleExtrasText');
     const elExtrasList = document.getElementById('nmExtrasList');
+    const elItemNote = document.getElementById('nmItemNote');
 
     const elCatSheet = document.getElementById('nmCatSheet');
     const elCatBackdrop = document.getElementById('nmCatBackdrop');
@@ -321,6 +360,7 @@
       return {
         id: Number(btn.getAttribute('data-produk-id')),
         nama: btn.getAttribute('data-produk-nama') || '',
+        deskripsi: btn.getAttribute('data-produk-deskripsi') || '',
         harga: harga,
       };
     };
@@ -334,7 +374,11 @@
         if (!Number.isFinite(id) || id <= 0) continue;
         if (!Number.isFinite(jumlah) || jumlah <= 0) continue;
         const extra_ids = Array.isArray(row.extra_ids) ? row.extra_ids.map(Number).filter((x) => Number.isFinite(x) && x > 0) : [];
-        out[String(id)] = { jumlah: Math.floor(jumlah), extra_ids: extra_ids };
+        out[String(id)] = {
+          jumlah: Math.floor(jumlah),
+          extra_ids: extra_ids,
+          catatan: String(row && row.catatan || '').trim()
+        };
       }
       return out;
     };
@@ -370,6 +414,7 @@
       const merged = {};
       for (const [produkId, row] of Object.entries(d)) {
         merged[String(produkId)] = { produk_id: Number(produkId), jumlah: row.jumlah, extra_ids: row.extra_ids };
+        merged[String(produkId)].catatan = String(row.catatan || '').trim();
       }
       return merged;
     };
@@ -395,6 +440,7 @@
       const out = {};
       for (const [pid, row] of Object.entries(cart)) {
         out[String(pid)] = { jumlah: Number(row.jumlah || 0), extra_ids: Array.isArray(row.extra_ids) ? row.extra_ids : [] };
+        out[String(pid)].catatan = String(row.catatan || '').trim();
       }
       return out;
     };
@@ -441,11 +487,15 @@
           return nm ? nm : ('Extra #' + String(exId));
         });
         const extraLabel = extras.length ? ('<div class="nm-cartitem__extras">+' + extras.map((x) => escapeHtml(x)).join(', ') + '</div>') : '';
+        const noteLabel = String(row.catatan || '').trim() !== ''
+          ? ('<div class="nm-cartitem__extras">Catatan: ' + escapeHtml(String(row.catatan || '')) + '</div>')
+          : '';
         return (
           '<div class="nm-cartitem">' +
             '<div class="nm-cartitem__main">' +
               '<div class="nm-cartitem__name">' + escapeHtml(meta.nama) + '</div>' +
               extraLabel +
+              noteLabel +
               '<div class="nm-cartitem__price">' + currency(meta.harga) + '</div>' +
             '</div>' +
             '<div class="nm-cartitem__ctrl">' +
@@ -781,14 +831,23 @@
       const pid = Number(btn.getAttribute('data-produk-id') || 0);
       const nm = btn.getAttribute('data-produk-nama') || '';
       const harga = Number(btn.getAttribute('data-produk-harga') || 0);
+      const deskripsi = btn.getAttribute('data-produk-deskripsi') || '';
 
-      currentProduk = { id: pid, nama: nm, harga: harga };
+      currentProduk = { id: pid, nama: nm, harga: harga, deskripsi: deskripsi };
       elPopName.textContent = nm;
       elPopPrice.textContent = currency(harga);
+      if (elPopDesc) {
+        const cleanDesc = String(deskripsi || '').trim();
+        elPopDesc.textContent = cleanDesc;
+        elPopDesc.hidden = cleanDesc === '';
+      }
       elQty.value = '1';
 
       const row = cart[String(pid)] || null;
       const preselected = Array.isArray(row && row.extra_ids) ? row.extra_ids : [];
+      if (elItemNote) {
+        elItemNote.value = String(row && row.catatan || '');
+      }
       currentExtraGroups = await fetchExtraGroups(pid);
       renderExtraGroups(currentExtraGroups, preselected);
       const hasExtras = Boolean(currentExtraGroups && currentExtraGroups.length > 0);
@@ -838,7 +897,13 @@
         return;
       }
       const extraIds = getSelectedExtraIdsFromPopup();
-      cart[String(currentProduk.id)] = { produk_id: currentProduk.id, jumlah: jumlah, extra_ids: extraIds };
+      const itemNote = elItemNote ? String(elItemNote.value || '').trim() : '';
+      cart[String(currentProduk.id)] = {
+        produk_id: currentProduk.id,
+        jumlah: jumlah,
+        extra_ids: extraIds,
+        catatan: itemNote
+      };
       step = 'menu';
       saveLocal();
       renderCartBar();

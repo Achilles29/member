@@ -26,6 +26,11 @@
                 <span class="nm-reviewitem__extras">+ <?= html_escape(implode(', ', array_column($item['extra'], 'nama'))) ?></span>
               <?php endif; ?>
             </div>
+            <?php if (!empty($item['catatan'])): ?>
+              <div class="nm-reviewitem__sub" style="margin-top:4px;">
+                <span>Catatan: <?= html_escape((string) $item['catatan']) ?></span>
+              </div>
+            <?php endif; ?>
           </div>
           <div class="nm-reviewitem__right">
             <div class="nm-reviewitem__price">Rp <?= number_format((float) ($item['subtotal'] ?? 0), 0, ',', '.') ?></div>

@@ -4,6 +4,7 @@ defined('BASEPATH') or exit('No direct script access allowed');
 class Order extends CI_Controller
 {
     private $order_schema_ready = false;
+    private $self_order_context_cache = null;
 
     public function __construct()
     {
@@ -317,29 +318,33 @@ class Order extends CI_Controller
         return is_array($member) ? $member : [];
     }
 
+    private function current_self_order_context()
+    {
+        if (is_array($this->self_order_context_cache)) {
+            return $this->self_order_context_cache;
+        }
+
+        $table_id = (int) ($this->session->userdata('order_meja_id') ?? 0);
+        $table_no = (string) ($this->session->userdata('order_nomor_meja') ?? '');
+        $context = $this->Pending_order_model->resolve_current_self_order_context($table_id, $table_no);
+        $this->self_order_context_cache = is_array($context) ? $context : [];
+
+        return $this->self_order_context_cache;
+    }
+
+    private function current_self_order_outlet_id()
+    {
+        $context = $this->current_self_order_context();
+        return (int) ($context['outlet_id'] ?? 0);
+    }
+
     private function get_product_row($produk_id)
     {
         $produk_id = (int) $produk_id;
         if ($produk_id <= 0) {
             return null;
         }
-
-        $this->db
-            ->select('p.id, p.product_name as nama_produk, p.selling_price as harga_jual, p.photo_path as foto, c.product_division_id as pr_divisi_id', false)
-            ->from('mst_product p')
-            ->join('mst_product_category c', 'c.id = p.product_category_id', 'left')
-            ->where('p.id', $produk_id)
-            ->where('p.is_active', 1);
-        if ($this->db->field_exists('show_in_self_order', 'mst_product')) {
-            $this->db->where('p.show_in_self_order', 1);
-        } else {
-            $this->db->group_start()
-                ->where('p.show_member', 1)
-                ->or_where('p.show_pos', 1)
-                ->group_end();
-        }
-
-        return $this->db->limit(1)->get()->row();
+        return $this->Produk_model->get_by_id($produk_id, $this->current_self_order_outlet_id());
     }
 
     private function get_extra_row($extra_id)
@@ -395,9 +400,24 @@ class Order extends CI_Controller
             $out[$produk_id] = [
                 'jumlah' => $jumlah,
                 'extra_ids' => $extra_ids,
+                'catatan' => $this->normalize_order_line_note($row['catatan'] ?? ''),
             ];
         }
         return $out;
+    }
+
+    private function normalize_order_line_note($value)
+    {
+        $text = trim((string) $value);
+        if ($text === '') {
+            return '';
+        }
+
+        if (function_exists('mb_substr')) {
+            return mb_substr($text, 0, 255);
+        }
+
+        return substr($text, 0, 255);
     }
 
     /**
@@ -427,9 +447,9 @@ class Order extends CI_Controller
 
         $rows = $this->db
             ->select('
-                m.sort_order as map_sort_order,
                 g.id AS group_id,
                 g.group_name,
+                g.sort_order AS group_sort_order,
                 g.is_required,
                 g.min_select,
                 g.max_select,
@@ -445,9 +465,10 @@ class Order extends CI_Controller
             ->join('mst_extra_group_item gi', 'gi.extra_group_id = g.id', 'inner')
             ->join('mst_extra e', $extra_join, 'inner')
             ->where('m.product_id', $produk_id)
-            ->order_by('m.sort_order', 'ASC')
-            ->order_by('g.sort_order', 'ASC')
-            ->order_by('gi.sort_order', 'ASC')
+            ->order_by('COALESCE(g.sort_order, 999999)', 'ASC', false)
+            ->order_by('g.id', 'ASC')
+            ->order_by('COALESCE(gi.sort_order, 999999)', 'ASC', false)
+            ->order_by('e.id', 'ASC')
             ->get()
             ->result_array();
 
@@ -465,6 +486,7 @@ class Order extends CI_Controller
                 $groups_map[$gid] = [
                     'id'         => $gid,
                     'nama_group' => (string) ($row['group_name'] ?? ''),
+                    'group_sort_order' => (int) ($row['group_sort_order'] ?? 0),
                     'is_wajib'   => $is_required,
                     'min_pilih'  => $min,
                     'max_pilih'  => $max,
@@ -477,10 +499,36 @@ class Order extends CI_Controller
                 'harga'      => (float) ($row['selling_price'] ?? 0),
                 'hpp'        => (float) ($row['cost_amount'] ?? 0),
                 'tipe_extra' => (string) ($row['extra_type'] ?? 'ADD'),
+                'item_sort_order' => (int) ($row['item_sort_order'] ?? 0),
             ];
         }
+        $groups = array_values($groups_map);
+        usort($groups, static function (array $a, array $b): int {
+            $cmp = ((int) ($a['group_sort_order'] ?? 0)) <=> ((int) ($b['group_sort_order'] ?? 0));
+            if ($cmp !== 0) {
+                return $cmp;
+            }
+            return ((int) ($a['id'] ?? 0)) <=> ((int) ($b['id'] ?? 0));
+        });
+        foreach ($groups as &$group) {
+            $items = array_values((array) ($group['items'] ?? []));
+            usort($items, static function (array $a, array $b): int {
+                $cmp = ((int) ($a['item_sort_order'] ?? 0)) <=> ((int) ($b['item_sort_order'] ?? 0));
+                if ($cmp !== 0) {
+                    return $cmp;
+                }
+                return ((int) ($a['id'] ?? 0)) <=> ((int) ($b['id'] ?? 0));
+            });
+            foreach ($items as &$item) {
+                unset($item['item_sort_order']);
+            }
+            unset($item);
+            $group['items'] = $items;
+            unset($group['group_sort_order']);
+        }
+        unset($group);
 
-        return ['produk_id' => $produk_id, 'groups' => array_values($groups_map)];
+        return ['produk_id' => $produk_id, 'groups' => $groups];
     }
 
     public function get_extra_options_produk()
@@ -566,6 +614,7 @@ class Order extends CI_Controller
             $out[$produk_id] = [
                 'jumlah' => $jumlah,
                 'extra_ids' => $san['extra_ids'],
+                'catatan' => $this->normalize_order_line_note($row['catatan'] ?? ''),
             ];
         }
         return ['ok' => true, 'message' => null, 'cart' => $out];
@@ -594,6 +643,7 @@ class Order extends CI_Controller
                 'harga' => $harga,
                 'subtotal' => $subtotal,
                 'extra' => [],
+                'catatan' => $this->normalize_order_line_note($row['catatan'] ?? ''),
             ];
 
             $extra_ids = $row['extra_ids'] ?? [];
@@ -657,6 +707,11 @@ class Order extends CI_Controller
             return;
         }
         $cart = $sanitized['cart'];
+        $availability = $this->validate_cart_product_availability($cart);
+        if (!$availability['ok']) {
+            $this->json_response(['ok' => false, 'error' => 'stock_unavailable', 'message' => $availability['message']], 422);
+            return;
+        }
         $step = strtoupper(trim((string) ($payload['step'] ?? '')));
         $step = strtolower($step);
         if (!in_array($step, ['menu', 'review', 'pay'], true)) {
@@ -728,8 +783,9 @@ class Order extends CI_Controller
         // Ambil produk berdasarkan kategori (dikelompokkan)
         $this->load->model('Produk_model');
         $data['produk_per_kategori'] = [];
+        $outlet_id = $this->current_self_order_outlet_id();
         foreach ($kategori as $kat) {
-            $data['produk_per_kategori'][$kat->id] = $this->Produk_model->get_by_kategori($kat->id);
+            $data['produk_per_kategori'][$kat->id] = $this->Produk_model->get_by_kategori($kat->id, $outlet_id);
         }
 
         $data['extras'] = $this->get_active_extras_lookup();
@@ -796,6 +852,33 @@ class Order extends CI_Controller
         return $total;
     }
 
+    private function validate_cart_product_availability($cart)
+    {
+        $cart = $this->normalize_cart($cart);
+        if (empty($cart)) {
+            return ['ok' => true];
+        }
+
+        foreach ($cart as $produk_id => $row) {
+            $produk = $this->get_product_row((int) $produk_id);
+            if (!$produk) {
+                return [
+                    'ok' => false,
+                    'message' => 'Salah satu menu di keranjang sudah tidak tersedia. Silakan pilih ulang menu.'
+                ];
+            }
+
+            if ((int) ($produk->is_available_for_order ?? 0) !== 1) {
+                return [
+                    'ok' => false,
+                    'message' => 'Menu ' . (string) ($produk->nama_produk ?? 'ini') . ' sedang habis. Silakan hapus dari keranjang lalu pilih menu lain.'
+                ];
+            }
+        }
+
+        return ['ok' => true];
+    }
+
     public function submit()
     {
         // Backward-compat: flow lama yang langsung POST ke submit.
@@ -827,11 +910,12 @@ class Order extends CI_Controller
     public function filter_produk()
     {
         $this->load->model('Produk_model');
+        $outlet_id = $this->current_self_order_outlet_id();
 
         $keyword = $this->input->post('keyword');
         $kategori = $this->input->post('kategori');
 
-        $data['produk'] = $this->Produk_model->search($keyword, $kategori);
+        $data['produk'] = $this->Produk_model->search($keyword, $kategori, $outlet_id);
         $this->load->view('order/produk_grid', $data);
     }
     public function review()
@@ -849,44 +933,18 @@ class Order extends CI_Controller
             redirect('order');
         }
         $cart = $sanitized['cart'];
+        $availability = $this->validate_cart_product_availability($cart);
+        if (!$availability['ok']) {
+            $this->session->set_flashdata('error', $availability['message']);
+            redirect('order');
+            return;
+        }
         if (empty($cart)) {
             $this->session->set_flashdata('error', 'Tidak ada produk yang dipilih.');
             redirect('order');
         }
 
-        $produk_list = [];
-        $total = 0;
-
-        foreach ($produk as $produk_id => $jumlah) {
-            $row = $this->get_product_row((int) $produk_id);
-            if (!$row) continue;
-
-            $harga = $row->harga_jual;
-            $subtotal = $harga * $jumlah;
-            $total += $subtotal;
-
-            $produk_list[$produk_id] = [
-                'nama' => $row->nama_produk,
-                'jumlah' => $jumlah,
-                'harga' => $harga,
-                'subtotal' => $subtotal,
-                'extra' => []
-            ];
-
-            // Ambil nama extra jika ada
-            if (isset($cart[$produk_id]['extra_ids']) && is_array($cart[$produk_id]['extra_ids'])) {
-                foreach ($cart[$produk_id]['extra_ids'] as $ex_id) {
-                    $ex = $this->get_extra_row((int) $ex_id);
-                    if ($ex) {
-                        $produk_list[$produk_id]['extra'][] = [
-                            'nama' => $ex->nama_extra,
-                            'harga' => $ex->harga
-                        ];
-                        $total += $ex->harga * $jumlah; // dikali jumlah produk
-                    }
-                }
-            }
-        }
+        [$produk_list, $total] = $this->compute_review_data_from_cart($cart);
 
         $data['produk_list'] = $produk_list;
         $data['total'] = $total;
@@ -924,6 +982,12 @@ class Order extends CI_Controller
             redirect('order');
         }
         $cart = $sanitized['cart'];
+        $availability = $this->validate_cart_product_availability($cart);
+        if (!$availability['ok']) {
+            $this->session->set_flashdata('error', $availability['message']);
+            redirect('order');
+            return;
+        }
         [$produk_list, $total] = $this->compute_review_data_from_cart($cart);
         if (empty($produk_list)) {
             $this->session->set_flashdata('error', 'Keranjang kosong. Pilih menu dulu ya.');
@@ -968,6 +1032,13 @@ class Order extends CI_Controller
             }
         }
 
+        $availability = $this->validate_cart_product_availability($cart);
+        if (!$availability['ok']) {
+            $this->session->set_flashdata('error', $availability['message']);
+            redirect('order');
+            return;
+        }
+
         // Mark step buat resume (scan ulang langsung balik ke halaman pay).
         $this->session->set_userdata('order_flow_step', 'pay');
 
@@ -1008,8 +1079,15 @@ class Order extends CI_Controller
             redirect('order');
         }
         $cart = $sanitized['cart'];
+        $availability = $this->validate_cart_product_availability($cart);
+        if (!$availability['ok']) {
+            $this->session->set_flashdata('error', $availability['message']);
+            redirect('order');
+            return;
+        }
 
         $nomor_meja = $this->session->userdata('order_nomor_meja');
+        $table_id = (int) $this->session->userdata('order_meja_id');
         $catatan = $this->input->post('catatan', true);
         $payment_method = strtoupper(trim((string) $this->input->post('payment_method', true)));
         if (!in_array($payment_method, ['KASIR', 'QRIS'], true)) {
@@ -1034,14 +1112,21 @@ class Order extends CI_Controller
                 $total,
                 $payment_method,
                 $payment_status,
-                $payment_provider
+                $payment_provider,
+                null,
+                $table_id
             );
 
             foreach ($cart as $produk_id => $row) {
                 $jumlah = (int) ($row['jumlah'] ?? 0);
                 if ($jumlah <= 0) continue;
 
-                $detail_id = $this->Pending_order_detail_model->insert_detail($order_id, (int) $produk_id, $jumlah);
+                $detail_id = $this->Pending_order_detail_model->insert_detail(
+                    $order_id,
+                    (int) $produk_id,
+                    $jumlah,
+                    $this->normalize_order_line_note($row['catatan'] ?? '')
+                );
 
                 $extra_ids = $row['extra_ids'] ?? [];
                 if (!empty($extra_ids) && $detail_id > 0) {
@@ -1091,12 +1176,6 @@ class Order extends CI_Controller
             return;
         }
 
-        if (!$this->midtrans_is_configured()) {
-            $this->session->set_flashdata('error', 'QRIS belum dikonfigurasi. Hubungi kasir ya.');
-            redirect('order/pay');
-            return;
-        }
-
         $order = $this->Pending_order_model->get_for_member($pending_id, $customer_id);
 
         if (!$order) {
@@ -1104,8 +1183,18 @@ class Order extends CI_Controller
             return;
         }
 
+        $order_status = strtoupper((string) ($order['status'] ?? 'PENDING'));
+        $is_rejected_order = in_array($order_status, ['REJECTED', 'CANCELLED', 'CANCEL', 'VOID'], true);
+        if (!$is_rejected_order && !$this->midtrans_is_configured()) {
+            $this->session->set_flashdata('error', 'QRIS belum dikonfigurasi. Hubungi kasir ya.');
+            redirect('order/pay');
+            return;
+        }
         $payment_status = strtoupper((string) ($order['payment_status'] ?? ''));
-        if ($payment_status === 'PAID') {
+        if ($is_rejected_order) {
+            $payment_status = 'REJECTED';
+        }
+        if (!$is_rejected_order && $payment_status === 'PAID') {
             $this->session->set_userdata('last_pending_order_id', (int) $pending_id);
             $this->session->set_userdata('last_pending_order_payment_method', 'QRIS');
             redirect('order/selesai');
@@ -1197,6 +1286,12 @@ class Order extends CI_Controller
             $qris_error = 'QRIS sudah dibuat, tapi QR tidak tersedia. Silakan buat QR baru.';
         }
 
+        if ($is_rejected_order) {
+            $qris_payload = [];
+            $qris_error = 'Pesanan ini sudah ditolak kasir.'
+                . (!empty($order['rejection_reason']) ? ' Alasan: ' . (string) $order['rejection_reason'] : '');
+        }
+
         $data = [
             'title' => 'QRIS',
             'order' => $order,
@@ -1205,6 +1300,7 @@ class Order extends CI_Controller
             'qris' => $qris_payload,
             'payment_status' => $payment_status ?: 'PENDING',
             'qris_error' => $qris_error,
+            'is_rejected_order' => $is_rejected_order,
         ];
 
         $this->load->view('templates/member/header', $data);
@@ -1230,6 +1326,17 @@ class Order extends CI_Controller
 
         if (!$order) {
             $this->json_response(['ok' => false, 'message' => 'Order tidak ditemukan.'], 404);
+            return;
+        }
+
+        $order_status = strtoupper((string) ($order['status'] ?? 'PENDING'));
+        if (in_array($order_status, ['REJECTED', 'CANCELLED', 'CANCEL', 'VOID'], true)) {
+            $this->json_response([
+                'ok' => true,
+                'status' => 'REJECTED',
+                'order_status' => $order_status,
+                'rejected' => true,
+            ]);
             return;
         }
 
@@ -1264,6 +1371,12 @@ class Order extends CI_Controller
 
         if (!$order) {
             show_error('Order tidak ditemukan.', 404);
+            return;
+        }
+
+        if (in_array(strtoupper((string) ($order['status'] ?? 'PENDING')), ['REJECTED', 'CANCELLED', 'CANCEL', 'VOID'], true)) {
+            $this->session->set_flashdata('error', 'Pesanan ini sudah ditolak kasir dan QR tidak bisa dibuat ulang.');
+            redirect('order');
             return;
         }
 

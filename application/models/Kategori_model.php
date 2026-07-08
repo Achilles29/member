@@ -11,9 +11,17 @@ class Kategori_model extends CI_Model
     private function base_query()
     {
         $hasSelfOrderFlag = $this->db->field_exists('show_in_self_order', 'mst_product');
-        $productVisibilityExpr = $hasSelfOrderFlag
-            ? 'p.show_in_self_order = 1'
-            : '(p.show_member = 1 OR p.show_pos = 1)';
+        $hasShowMember = $this->db->field_exists('show_member', 'mst_product');
+        $visibilityParts = [];
+        if ($hasShowMember) {
+            $visibilityParts[] = 'p.show_member = 1';
+        }
+        if ($hasSelfOrderFlag) {
+            $visibilityParts[] = 'p.show_in_self_order = 1';
+        } else {
+            $visibilityParts[] = 'p.show_pos = 1';
+        }
+        $productVisibilityExpr = implode(' AND ', $visibilityParts);
 
         $this->db->select('c.id, c.name as nama_kategori, c.sort_order');
         $this->db->from($this->table . ' c');

@@ -1,6 +1,20 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 class Pending_order_detail_model extends CI_Model {
+    private function nullable_note($value)
+    {
+        $text = trim((string) $value);
+        if ($text === '') {
+            return null;
+        }
+
+        if (function_exists('mb_substr')) {
+            return mb_substr($text, 0, 255);
+        }
+
+        return substr($text, 0, 255);
+    }
+
     private function map_availability_mode($stock_mode)
     {
         $stock_mode = strtoupper(trim((string) $stock_mode));
@@ -14,7 +28,7 @@ class Pending_order_detail_model extends CI_Model {
         return 'AUTO';
     }
 
-    public function insert_detail($order_id, $produk_id, $jumlah) {
+    public function insert_detail($order_id, $produk_id, $jumlah, $catatan = null) {
         $produk = $this->db->get_where('mst_product', ['id' => (int) $produk_id])->row();
         if (!$produk) {
             return 0;
@@ -59,7 +73,7 @@ class Pending_order_detail_model extends CI_Model {
             'availability_mode_snapshot' => $this->map_availability_mode($produk->stock_mode ?? 'AUTO'),
             'line_status' => 'OPEN',
             'process_status' => 'NOT_PROCESSED',
-            'notes' => null,
+            'notes' => $this->nullable_note($catatan),
         ];
 
         $this->db->insert('pos_order_line', $data);

@@ -13,6 +13,10 @@
     </a>
   </div>
 
+  <?php
+    $order_status = strtoupper((string) ($order['status'] ?? 'PENDING'));
+    $is_rejected_order = !empty($is_rejected_order);
+  ?>
   <?php if (!empty($qris_error)): ?>
     <div class="nm-card" style="margin-top:-22px;">
       <div class="nm-alert nm-alert--danger">
@@ -30,6 +34,9 @@
       Order ID: <strong>#<?= (int) ($order['id'] ?? 0) ?></strong>
     </div>
     <div class="nm-order__hint">
+      Status order: <strong><?= html_escape($order_status) ?></strong>
+    </div>
+    <div class="nm-order__hint">
       Status pembayaran: <strong id="qris-status"><?= html_escape((string) ($payment_status ?? 'PENDING')) ?></strong>
     </div>
   </div>
@@ -37,9 +44,13 @@
   <div class="nm-card">
     <?php $qr_url = $qris['qr_url'] ?? ''; ?>
     <?php $qr_string = $qris['qr_string'] ?? ''; ?>
-    <?php $has_qr = !empty($qr_url) || !empty($qr_string); ?>
+    <?php $has_qr = !$is_rejected_order && (!empty($qr_url) || !empty($qr_string)); ?>
 
-    <?php if (!empty($qr_url)): ?>
+    <?php if ($is_rejected_order): ?>
+      <div class="nm-order__hint">
+        Pesanan tidak bisa diproses lebih lanjut. Jika perlu bantuan, hubungi kasir atau outlet.
+      </div>
+    <?php elseif (!empty($qr_url)): ?>
       <div style="text-align:center;">
         <img src="<?= html_escape($qr_url) ?>" alt="QRIS" style="max-width:240px;width:100%;height:auto;" />
       </div>
@@ -70,10 +81,10 @@
     <?php if ($has_qr): ?>
       <a class="nm-btn nm-btn--primary nm-btn--block" href="#" id="qris-check">Cek status pembayaran</a>
     <?php endif; ?>
-    <?php if (in_array(strtoupper((string) ($payment_status ?? '')), ['EXPIRED', 'FAILED'], true) || !$has_qr): ?>
+    <?php if (!$is_rejected_order && (in_array(strtoupper((string) ($payment_status ?? '')), ['EXPIRED', 'FAILED'], true) || !$has_qr)): ?>
       <a class="nm-btn nm-btn--ghost nm-btn--block" href="<?= base_url('order/qris_regenerate/' . (int) ($order['id'] ?? 0)) ?>">Buat QR baru</a>
     <?php endif; ?>
-    <a class="nm-btn nm-btn--ghost nm-btn--block" href="<?= base_url('order/pay') ?>">Kembali</a>
+    <a class="nm-btn nm-btn--ghost nm-btn--block" href="<?= base_url($is_rejected_order ? 'order' : 'order/pay') ?>"><?= $is_rejected_order ? 'Kembali ke Menu' : 'Kembali' ?></a>
   </div>
 
   <?php $this->load->view('templates/member/bottom_nav'); ?>
@@ -82,6 +93,7 @@
 <script>
   (function () {
     const orderId = <?= (int) ($order['id'] ?? 0) ?>;
+    const isRejectedOrder = <?= !empty($is_rejected_order) ? 'true' : 'false' ?>;
     const statusEl = document.getElementById('qris-status');
     const checkBtn = document.getElementById('qris-check');
     let isChecking = false;
@@ -94,6 +106,10 @@
         const data = await res.json();
         if (data && data.ok) {
           const status = String(data.status || '').toUpperCase();
+          if (data.rejected || status === 'REJECTED') {
+            window.location.reload();
+            return;
+          }
           if (statusEl) statusEl.textContent = status || 'PENDING';
           if (status === 'PAID') {
             window.location.href = '<?= base_url('order/selesai') ?>';
@@ -104,13 +120,15 @@
       isChecking = false;
     }
 
-    if (checkBtn) {
+    if (!isRejectedOrder && checkBtn) {
       checkBtn.addEventListener('click', function (e) {
         e.preventDefault();
         checkStatus();
       });
     }
 
-    setInterval(checkStatus, 5000);
+    if (!isRejectedOrder) {
+      setInterval(checkStatus, 5000);
+    }
   })();
 </script>
