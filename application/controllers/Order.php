@@ -5,10 +5,12 @@ class Order extends CI_Controller
 {
     private $order_schema_ready = false;
     private $self_order_context_cache = null;
+    private $order_mode = 'self';
 
     public function __construct()
     {
         parent::__construct();
+        $this->order_mode = strtolower((string) $this->router->class) === 'online_order' ? 'online' : 'self';
         $this->load->model([
             'Member_model',
             'Produk_model',
@@ -60,6 +62,18 @@ class Order extends CI_Controller
                 $this->session->set_flashdata('error', 'Fitur order member belum siap karena tabel POS finance wajib belum lengkap di db_finance.');
                 redirect('member');
             }
+
+            if ($this->is_self_order_flow() && !$this->has_self_order_context()) {
+                if ($this->input->is_ajax_request()) {
+                    $this->json_response([
+                        'ok' => false,
+                        'message' => 'Scan QR meja dulu untuk membuka self order.'
+                    ], 403);
+                    return;
+                }
+                redirect('online-order');
+                return;
+            }
         }
     }
 
@@ -80,6 +94,86 @@ class Order extends CI_Controller
             }
         }
         return true;
+    }
+
+    private function is_self_order_flow()
+    {
+        return $this->order_mode !== 'online';
+    }
+
+    private function is_online_order_flow()
+    {
+        return $this->order_mode === 'online';
+    }
+
+    private function has_self_order_context()
+    {
+        return (int) ($this->session->userdata('order_meja_id') ?? 0) > 0
+            || trim((string) ($this->session->userdata('order_nomor_meja') ?? '')) !== '';
+    }
+
+    private function order_base_path()
+    {
+        return $this->is_online_order_flow() ? 'online-order' : 'order';
+    }
+
+    private function order_session_key($suffix)
+    {
+        $suffix = trim((string) $suffix);
+        return ($this->is_online_order_flow() ? 'online_order_' : 'order_') . $suffix;
+    }
+
+    private function order_session($suffix)
+    {
+        return $this->session->userdata($this->order_session_key($suffix));
+    }
+
+    private function set_order_session($suffix, $value)
+    {
+        $this->session->set_userdata($this->order_session_key($suffix), $value);
+    }
+
+    private function unset_order_session($suffixes)
+    {
+        foreach ((array) $suffixes as $suffix) {
+            $this->session->unset_userdata($this->order_session_key($suffix));
+        }
+    }
+
+    private function redirect_order($path = '')
+    {
+        $path = trim((string) $path, '/');
+        redirect($this->order_base_path() . ($path !== '' ? '/' . $path : ''));
+    }
+
+    private function product_visibility_context()
+    {
+        return $this->is_online_order_flow() ? 'online_food' : 'self_order';
+    }
+
+    private function current_order_channel()
+    {
+        return $this->is_online_order_flow() ? 'DELIVERY' : 'SELF_ORDER';
+    }
+
+    private function current_service_type($nomor_meja = null)
+    {
+        if ($this->is_online_order_flow()) {
+            return 'DELIVERY';
+        }
+
+        return trim((string) $nomor_meja) !== '' ? 'DINE_IN' : 'TAKE_AWAY';
+    }
+
+    private function order_view_data(array $data = [])
+    {
+        return array_merge([
+            'order_mode' => $this->order_mode,
+            'is_online_order' => $this->is_online_order_flow(),
+            'order_base_path' => $this->order_base_path(),
+            'order_storage_suffix' => $this->is_online_order_flow() ? 'online' : 'self_' . (int) ($this->session->userdata('order_meja_id') ?? 0),
+            'active_menu' => $this->is_online_order_flow() ? 'online_order' : 'order',
+        ], $data);
     }
 
     private function midtrans_config()
@@ -344,7 +438,7 @@ class Order extends CI_Controller
         if ($produk_id <= 0) {
             return null;
         }
-        return $this->Produk_model->get_by_id($produk_id, $this->current_self_order_outlet_id());
+        return $this->Produk_model->get_by_id($produk_id, $this->current_self_order_outlet_id(), $this->product_visibility_context());
     }
 
     private function get_extra_row($extra_id)
@@ -668,26 +762,26 @@ class Order extends CI_Controller
     public function resume()
     {
         // Urutan prioritas: kalau user sudah di tahap akhir, langsung arahkan.
-        $step = (string) ($this->session->userdata('order_flow_step') ?? '');
-        $cart_final = $this->session->userdata('order_cart');
-        $cart_draft = $this->session->userdata('order_draft_cart');
+        $step = (string) ($this->order_session('flow_step') ?? '');
+        $cart_final = $this->order_session('cart');
+        $cart_draft = $this->order_session('draft_cart');
 
         if ($step === 'pay' && is_array($cart_final) && !empty($cart_final)) {
-            redirect('order/pay');
+            $this->redirect_order('pay');
             return;
         }
 
         if ($step === 'pay' && is_array($cart_draft) && !empty($cart_draft)) {
-            redirect('order/pay');
+            $this->redirect_order('pay');
             return;
         }
 
         if ($step === 'review' && is_array($cart_draft) && !empty($cart_draft)) {
-            redirect('order/review_session');
+            $this->redirect_order('review_session');
             return;
         }
 
-        redirect('order');
+        $this->redirect_order();
     }
 
     public function save_cart()
@@ -721,63 +815,59 @@ class Order extends CI_Controller
         // Total dihitung server-side (anti manipulasi).
         $total = $this->compute_total_from_cart($cart);
 
-        $this->session->set_userdata('order_draft_cart', $cart);
-        $this->session->set_userdata('order_draft_total', $total);
-        $this->session->set_userdata('order_flow_step', $step);
+        $this->set_order_session('draft_cart', $cart);
+        $this->set_order_session('draft_total', $total);
+        $this->set_order_session('flow_step', $step);
 
         $this->json_response(['ok' => true, 'total' => $total]);
     }
 
     public function clear_cart()
     {
-        $this->session->unset_userdata('order_draft_cart');
-        $this->session->unset_userdata('order_draft_total');
-        $this->session->unset_userdata('order_cart');
-        $this->session->unset_userdata('order_total');
-        $this->session->unset_userdata('order_flow_step');
+        $this->unset_order_session(['draft_cart', 'draft_total', 'cart', 'total', 'flow_step']);
 
-        redirect('order');
+        $this->redirect_order();
     }
 
     public function menu()
     {
         // Bypass "resume" redirect supaya tombol "Tambah menu" dari review bisa balik ke list menu.
         // Keranjang draft tetap disimpan, tapi keranjang final di-reset agar total dihitung ulang saat confirm.
-        $this->session->set_userdata('order_flow_step', 'menu');
-        $this->session->unset_userdata('order_cart');
-        $this->session->unset_userdata('order_total');
+        $this->set_order_session('flow_step', 'menu');
+        $this->unset_order_session(['cart', 'total']);
 
-        redirect('order');
+        $this->redirect_order();
     }
 
     public function index()
     {
         $customer_id = $this->session->userdata('member_id');
-        $data['title'] = 'Order';
-        $data['active_menu'] = 'order';
-        $data['nomor_meja'] = $this->session->userdata('order_nomor_meja');
-        $data['meja_id'] = (int) ($this->session->userdata('order_meja_id') ?? 0);
+        $data = $this->order_view_data([
+            'title' => $this->is_online_order_flow() ? 'Online Order' : 'Order',
+            'nomor_meja' => $this->is_self_order_flow() ? $this->session->userdata('order_nomor_meja') : null,
+            'meja_id' => $this->is_self_order_flow() ? (int) ($this->session->userdata('order_meja_id') ?? 0) : 0,
+        ]);
 
         // Resume logic (kalau user sudah punya keranjang / sudah sampai pay).
-        $step = (string) ($this->session->userdata('order_flow_step') ?? '');
-        $cart_final = $this->session->userdata('order_cart');
-        $cart_draft = $this->session->userdata('order_draft_cart');
+        $step = (string) ($this->order_session('flow_step') ?? '');
+        $cart_final = $this->order_session('cart');
+        $cart_draft = $this->order_session('draft_cart');
         if ($step === 'pay' && is_array($cart_final) && !empty($cart_final)) {
-            redirect('order/pay');
+            $this->redirect_order('pay');
             return;
         }
         if ($step === 'pay' && is_array($cart_draft) && !empty($cart_draft)) {
-            redirect('order/pay');
+            $this->redirect_order('pay');
             return;
         }
         if ($step === 'review' && is_array($cart_draft) && !empty($cart_draft)) {
-            redirect('order/review_session');
+            $this->redirect_order('review_session');
             return;
         }
 
         // Ambil semua kategori aktif dan urutkan
         $this->load->model('Kategori_model');
-        $kategori = $this->Kategori_model->get_all(); // status = 1, urutan ASC
+        $kategori = $this->Kategori_model->get_all($this->product_visibility_context()); // status = 1, urutan ASC
         $data['kategori'] = $kategori;
 
         // Ambil produk berdasarkan kategori (dikelompokkan)
@@ -785,7 +875,7 @@ class Order extends CI_Controller
         $data['produk_per_kategori'] = [];
         $outlet_id = $this->current_self_order_outlet_id();
         foreach ($kategori as $kat) {
-            $data['produk_per_kategori'][$kat->id] = $this->Produk_model->get_by_kategori($kat->id, $outlet_id);
+            $data['produk_per_kategori'][$kat->id] = $this->Produk_model->get_by_kategori($kat->id, $outlet_id, $this->product_visibility_context());
         }
 
         $data['extras'] = $this->get_active_extras_lookup();
@@ -794,8 +884,8 @@ class Order extends CI_Controller
         $data['member'] = $this->get_member_row($customer_id);
 
         // Draft cart untuk initial state (dipakai JS).
-        $data['draft_cart'] = $this->session->userdata('order_draft_cart');
-        $data['flow_step'] = (string) ($this->session->userdata('order_flow_step') ?? 'menu');
+        $data['draft_cart'] = $this->order_session('draft_cart');
+        $data['flow_step'] = (string) ($this->order_session('flow_step') ?? 'menu');
 
         // Load view
         $this->load->view('templates/member/header', $data);
@@ -899,15 +989,16 @@ class Order extends CI_Controller
     public function selesai()
     {
         $customer_id = $this->session->userdata('member_id');
-        $data['title'] = 'Order Terkirim';
-        $data['active_menu'] = 'order';
-        $data['member'] = $this->get_member_row($customer_id);
-        $data['nomor_meja'] = $this->session->userdata('order_nomor_meja');
-        $data['meja_id'] = (int) ($this->session->userdata('order_meja_id') ?? 0);
-        $data['pending_order'] = null;
-        $data['payment_method'] = $this->session->userdata('last_pending_order_payment_method');
+        $data = $this->order_view_data([
+            'title' => $this->is_online_order_flow() ? 'Online Order Terkirim' : 'Order Terkirim',
+            'member' => $this->get_member_row($customer_id),
+            'nomor_meja' => $this->is_self_order_flow() ? $this->session->userdata('order_nomor_meja') : null,
+            'meja_id' => $this->is_self_order_flow() ? (int) ($this->session->userdata('order_meja_id') ?? 0) : 0,
+            'pending_order' => null,
+            'payment_method' => $this->order_session('last_pending_order_payment_method'),
+        ]);
 
-        $pending_id = (int) ($this->session->userdata('last_pending_order_id') ?? 0);
+        $pending_id = (int) ($this->order_session('last_pending_order_id') ?? 0);
         if ($pending_id > 0) {
             $data['pending_order'] = $this->Pending_order_model->get_for_member($pending_id, (int) $customer_id);
         }
@@ -926,7 +1017,7 @@ class Order extends CI_Controller
         $keyword = $this->input->post('keyword');
         $kategori = $this->input->post('kategori');
 
-        $data['produk'] = $this->Produk_model->search($keyword, $kategori, $outlet_id);
+        $data['produk'] = $this->Produk_model->search($keyword, $kategori, $outlet_id, $this->product_visibility_context());
         $this->load->view('order/produk_grid', $data);
     }
     public function review()
@@ -941,35 +1032,36 @@ class Order extends CI_Controller
         $sanitized = $this->sanitize_cart_extra_rules($cart);
         if (!$sanitized['ok']) {
             $this->session->set_flashdata('error', $sanitized['message']);
-            redirect('order');
+            $this->redirect_order();
         }
         $cart = $sanitized['cart'];
         $availability = $this->validate_cart_product_availability($cart);
         if (!$availability['ok']) {
             $this->session->set_flashdata('error', $availability['message']);
-            redirect('order');
+            $this->redirect_order();
             return;
         }
         if (empty($cart)) {
             $this->session->set_flashdata('error', 'Tidak ada produk yang dipilih.');
-            redirect('order');
+            $this->redirect_order();
         }
 
         [$produk_list, $total] = $this->compute_review_data_from_cart($cart);
 
         $data['produk_list'] = $produk_list;
         $data['total'] = $total;
-        $data['title'] = "Review Order";
-        $data['nomor_meja'] = $this->session->userdata('order_nomor_meja');
+        $data = $this->order_view_data(array_merge($data, [
+            'title' => $this->is_online_order_flow() ? 'Review Online Order' : 'Review Order',
+            'nomor_meja' => $this->is_self_order_flow() ? $this->session->userdata('order_nomor_meja') : null,
+        ]));
 
         // Simpan ke session biar pay/confirm tidak tergantung hidden input.
-        $this->session->set_userdata('order_draft_cart', $cart);
-        $this->session->set_userdata('order_draft_total', $total);
-        $this->session->set_userdata('order_cart', $cart);
-        $this->session->set_userdata('order_total', $total);
-        $this->session->set_userdata('order_flow_step', 'review');
+        $this->set_order_session('draft_cart', $cart);
+        $this->set_order_session('draft_total', $total);
+        $this->set_order_session('cart', $cart);
+        $this->set_order_session('total', $total);
+        $this->set_order_session('flow_step', 'review');
 
-        $data['active_menu'] = 'order';
         $this->load->view('templates/member/header', $data);
         $this->load->view('order/review', $data);
         $this->load->view('templates/member/footer');
@@ -980,43 +1072,42 @@ class Order extends CI_Controller
         $customer_id = $this->session->userdata('member_id');
         if (!$customer_id) redirect('login');
 
-        $cart = $this->session->userdata('order_draft_cart');
+        $cart = $this->order_session('draft_cart');
         if (empty($cart) || !is_array($cart)) {
             $this->session->set_flashdata('error', 'Keranjang kosong. Pilih menu dulu ya.');
-            redirect('order');
+            $this->redirect_order();
         }
 
         $cart = $this->normalize_cart($cart);
         $sanitized = $this->sanitize_cart_extra_rules($cart);
         if (!$sanitized['ok']) {
             $this->session->set_flashdata('error', $sanitized['message']);
-            redirect('order');
+            $this->redirect_order();
         }
         $cart = $sanitized['cart'];
         $availability = $this->validate_cart_product_availability($cart);
         if (!$availability['ok']) {
             $this->session->set_flashdata('error', $availability['message']);
-            redirect('order');
+            $this->redirect_order();
             return;
         }
         [$produk_list, $total] = $this->compute_review_data_from_cart($cart);
         if (empty($produk_list)) {
             $this->session->set_flashdata('error', 'Keranjang kosong. Pilih menu dulu ya.');
-            redirect('order');
+            $this->redirect_order();
         }
 
-        $this->session->set_userdata('order_cart', $cart);
-        $this->session->set_userdata('order_total', $total);
-        $this->session->set_userdata('order_flow_step', 'review');
+        $this->set_order_session('cart', $cart);
+        $this->set_order_session('total', $total);
+        $this->set_order_session('flow_step', 'review');
 
-        $data = [
-            'title' => 'Review Order',
-            'active_menu' => 'order',
-            'nomor_meja' => $this->session->userdata('order_nomor_meja'),
+        $data = $this->order_view_data([
+            'title' => $this->is_online_order_flow() ? 'Review Online Order' : 'Review Order',
+            'nomor_meja' => $this->is_self_order_flow() ? $this->session->userdata('order_nomor_meja') : null,
             'produk_list' => $produk_list,
             'total' => $total,
             'member' => $this->get_member_row($customer_id),
-        ];
+        ]);
 
         $this->load->view('templates/member/header', $data);
         $this->load->view('order/review', $data);
@@ -1028,39 +1119,45 @@ class Order extends CI_Controller
         $customer_id = $this->session->userdata('member_id');
         if (!$customer_id) redirect('login');
 
-        $cart = $this->session->userdata('order_cart');
+        $cart = $this->order_session('cart');
         if (empty($cart) || !is_array($cart)) {
             // Fallback: kalau keranjang final belum kebentuk, ambil dari draft.
-            $draft = $this->session->userdata('order_draft_cart');
+            $draft = $this->order_session('draft_cart');
             $draft = $this->normalize_cart($draft);
             if (!empty($draft)) {
                 $cart = $draft;
-                $this->session->set_userdata('order_cart', $cart);
-                $this->session->set_userdata('order_total', $this->compute_total_from_cart($cart));
+                $this->set_order_session('cart', $cart);
+                $this->set_order_session('total', $this->compute_total_from_cart($cart));
             } else {
                 $this->session->set_flashdata('error', 'Keranjang kosong. Pilih menu dulu ya.');
-                redirect('order');
+                $this->redirect_order();
             }
         }
 
         $availability = $this->validate_cart_product_availability($cart);
         if (!$availability['ok']) {
             $this->session->set_flashdata('error', $availability['message']);
-            redirect('order');
+            $this->redirect_order();
             return;
         }
 
         // Mark step buat resume (scan ulang langsung balik ke halaman pay).
-        $this->session->set_userdata('order_flow_step', 'pay');
+        $this->set_order_session('flow_step', 'pay');
 
-        $data = [
-            'title' => 'Pembayaran',
-            'active_menu' => 'order',
-            'total' => (float) $this->session->userdata('order_total'),
-            'nomor_meja' => $this->session->userdata('order_nomor_meja'),
+        $data = $this->order_view_data([
+            'title' => $this->is_online_order_flow() ? 'Pembayaran Online Order' : 'Pembayaran',
+            'total' => (float) $this->order_session('total'),
+            'nomor_meja' => $this->is_self_order_flow() ? $this->session->userdata('order_nomor_meja') : null,
             'payment_method' => 'KASIR',
             'qris_enabled' => $this->midtrans_is_configured(),
-        ];
+            'cash_payment_label' => $this->is_online_order_flow() ? 'Bayar saat diterima' : 'Bayar di kasir',
+            'payment_hint' => $this->is_online_order_flow()
+                ? 'Pilih metode pembayaran. Ongkir berdasarkan jarak akan ditambahkan pada tahap berikutnya.'
+                : 'Pilih metode pembayaran. Default: bayar di kasir. QRIS via Midtrans.',
+            'catatan_placeholder' => $this->is_online_order_flow()
+                ? 'Contoh: alamat lengkap, patokan, atau instruksi pengantaran.'
+                : 'Contoh: tanpa es, kurang manis, dll.',
+        ]);
 
         $this->load->view('templates/member/header', $data);
         $this->load->view('order/pay', $data);
@@ -1072,7 +1169,7 @@ class Order extends CI_Controller
         $customer_id = (int) $this->session->userdata('member_id');
         if (!$customer_id) redirect('login');
 
-        $cart = $this->session->userdata('order_cart');
+        $cart = $this->order_session('cart');
         if (empty($cart) || !is_array($cart)) {
             $produk = $this->input->post('produk');
             $extra = $this->input->post('extra');
@@ -1081,24 +1178,24 @@ class Order extends CI_Controller
 
         if (empty($cart)) {
             $this->session->set_flashdata('error', 'Keranjang kosong. Pilih menu dulu ya.');
-            redirect('order');
+            $this->redirect_order();
         }
 
         $sanitized = $this->sanitize_cart_extra_rules($cart);
         if (!$sanitized['ok']) {
             $this->session->set_flashdata('error', $sanitized['message']);
-            redirect('order');
+            $this->redirect_order();
         }
         $cart = $sanitized['cart'];
         $availability = $this->validate_cart_product_availability($cart);
         if (!$availability['ok']) {
             $this->session->set_flashdata('error', $availability['message']);
-            redirect('order');
+            $this->redirect_order();
             return;
         }
 
-        $nomor_meja = $this->session->userdata('order_nomor_meja');
-        $table_id = (int) $this->session->userdata('order_meja_id');
+        $nomor_meja = $this->is_self_order_flow() ? $this->session->userdata('order_nomor_meja') : null;
+        $table_id = $this->is_self_order_flow() ? (int) $this->session->userdata('order_meja_id') : 0;
         $catatan = $this->input->post('catatan', true);
         $payment_method = strtoupper(trim((string) $this->input->post('payment_method', true)));
         if (!in_array($payment_method, ['KASIR', 'QRIS'], true)) {
@@ -1106,7 +1203,10 @@ class Order extends CI_Controller
         }
         if ($payment_method === 'QRIS' && !$this->midtrans_is_configured()) {
             $payment_method = 'KASIR';
-            $this->session->set_flashdata('error', 'QRIS sedang nonaktif. Silakan bayar di kasir.');
+            $this->session->set_flashdata('error', $this->is_online_order_flow()
+                ? 'QRIS sedang nonaktif. Silakan pilih bayar saat diterima.'
+                : 'QRIS sedang nonaktif. Silakan bayar di kasir.'
+            );
         }
         $payment_status = ($payment_method === 'QRIS') ? 'PENDING' : 'UNPAID';
         $payment_provider = ($payment_method === 'QRIS') ? 'MIDTRANS' : null;
@@ -1125,18 +1225,24 @@ class Order extends CI_Controller
                 $payment_status,
                 $payment_provider,
                 null,
-                $table_id
+                null,
+                $table_id,
+                $this->current_order_channel(),
+                $this->current_service_type($nomor_meja)
             );
 
             foreach ($cart as $produk_id => $row) {
                 $jumlah = (int) ($row['jumlah'] ?? 0);
                 if ($jumlah <= 0) continue;
+                $produk_row = $this->get_product_row((int) $produk_id);
+                if (!$produk_row) continue;
 
                 $detail_id = $this->Pending_order_detail_model->insert_detail(
                     $order_id,
                     (int) $produk_id,
                     $jumlah,
-                    $this->normalize_order_line_note($row['catatan'] ?? '')
+                    $this->normalize_order_line_note($row['catatan'] ?? ''),
+                    (float) ($produk_row->harga_jual ?? 0)
                 );
 
                 $extra_ids = $row['extra_ids'] ?? [];
@@ -1155,24 +1261,20 @@ class Order extends CI_Controller
             $this->db->trans_commit();
 
             // Simpan info order terakhir untuk halaman selesai/qris.
-            $this->session->set_userdata('last_pending_order_id', (int) $order_id);
-            $this->session->set_userdata('last_pending_order_payment_method', $payment_method);
+            $this->set_order_session('last_pending_order_id', (int) $order_id);
+            $this->set_order_session('last_pending_order_payment_method', $payment_method);
 
-            $this->session->unset_userdata('order_cart');
-            $this->session->unset_userdata('order_total');
-            $this->session->unset_userdata('order_draft_cart');
-            $this->session->unset_userdata('order_draft_total');
-            $this->session->unset_userdata('order_flow_step');
+            $this->unset_order_session(['cart', 'total', 'draft_cart', 'draft_total', 'flow_step']);
 
             if ($payment_method === 'QRIS') {
-                redirect('order/qris/' . (int) $order_id);
+                $this->redirect_order('qris/' . (int) $order_id);
             }
-            redirect('order/selesai');
+            $this->redirect_order('selesai');
         } catch (Throwable $e) {
             $this->db->trans_rollback();
             log_message('error', '[MEMBER][ORDER] confirm gagal: ' . $e->getMessage());
             $this->session->set_flashdata('error', 'Gagal mengirim pesanan. Coba lagi ya.');
-            redirect('order');
+            $this->redirect_order();
         }
     }
 
@@ -1198,7 +1300,7 @@ class Order extends CI_Controller
         $is_rejected_order = in_array($order_status, ['REJECTED', 'CANCELLED', 'CANCEL', 'VOID'], true);
         if (!$is_rejected_order && !$this->midtrans_is_configured()) {
             $this->session->set_flashdata('error', 'QRIS belum dikonfigurasi. Hubungi kasir ya.');
-            redirect('order/pay');
+            $this->redirect_order('pay');
             return;
         }
         $payment_status = strtoupper((string) ($order['payment_status'] ?? ''));
@@ -1206,17 +1308,17 @@ class Order extends CI_Controller
             $payment_status = 'REJECTED';
         }
         if (!$is_rejected_order && $payment_status === 'PAID') {
-            $this->session->set_userdata('last_pending_order_id', (int) $pending_id);
-            $this->session->set_userdata('last_pending_order_payment_method', 'QRIS');
-            redirect('order/selesai');
+            $this->set_order_session('last_pending_order_id', (int) $pending_id);
+            $this->set_order_session('last_pending_order_payment_method', 'QRIS');
+            $this->redirect_order('selesai');
             return;
         }
 
-        $this->session->set_userdata('last_pending_order_id', (int) $pending_id);
-        $this->session->set_userdata('last_pending_order_payment_method', 'QRIS');
+        $this->set_order_session('last_pending_order_id', (int) $pending_id);
+        $this->set_order_session('last_pending_order_payment_method', 'QRIS');
 
         $payment_ref = (string) ($order['payment_ref'] ?? '');
-        $session_key = 'qris_payload_' . (int) $pending_id;
+        $session_key = $this->order_session_key('qris_payload_' . (int) $pending_id);
         $qris_payload = $this->session->userdata($session_key);
         if (empty($qris_payload)) {
             $db_qr_url = (string) ($order['payment_qr_url'] ?? '');
@@ -1303,16 +1405,15 @@ class Order extends CI_Controller
                 . (!empty($order['rejection_reason']) ? ' Alasan: ' . (string) $order['rejection_reason'] : '');
         }
 
-        $data = [
+        $data = $this->order_view_data([
             'title' => 'QRIS',
             'order' => $order,
-            'nomor_meja' => $this->session->userdata('order_nomor_meja'),
-            'active_menu' => 'order',
+            'nomor_meja' => $this->is_self_order_flow() ? $this->session->userdata('order_nomor_meja') : null,
             'qris' => $qris_payload,
             'payment_status' => $payment_status ?: 'PENDING',
             'qris_error' => $qris_error,
             'is_rejected_order' => $is_rejected_order,
-        ];
+        ]);
 
         $this->load->view('templates/member/header', $data);
         $this->load->view('order/qris', $data);
@@ -1387,7 +1488,7 @@ class Order extends CI_Controller
 
         if (in_array(strtoupper((string) ($order['status'] ?? 'PENDING')), ['REJECTED', 'CANCELLED', 'CANCEL', 'VOID'], true)) {
             $this->session->set_flashdata('error', 'Pesanan ini sudah ditolak kasir dan QR tidak bisa dibuat ulang.');
-            redirect('order');
+            $this->redirect_order();
             return;
         }
 
@@ -1400,10 +1501,10 @@ class Order extends CI_Controller
             'payment_qr_string' => null,
         ]);
 
-        $session_key = 'qris_payload_' . (int) $pending_id;
+        $session_key = $this->order_session_key('qris_payload_' . (int) $pending_id);
         $this->session->unset_userdata($session_key);
 
-        redirect('order/qris/' . (int) $pending_id);
+        $this->redirect_order('qris/' . (int) $pending_id);
     }
 
     public function qris_simulate_paid($pending_id = null)
@@ -1428,10 +1529,10 @@ class Order extends CI_Controller
         $ref = 'DUMMY-' . date('YmdHis') . '-' . $pending_id;
         $this->Pending_order_model->mark_paid($pending_id, 'DUMMY', $ref);
 
-        $this->session->set_userdata('last_pending_order_id', (int) $pending_id);
-        $this->session->set_userdata('last_pending_order_payment_method', 'QRIS');
+        $this->set_order_session('last_pending_order_id', (int) $pending_id);
+        $this->set_order_session('last_pending_order_payment_method', 'QRIS');
 
-        redirect('order/selesai');
+        $this->redirect_order('selesai');
     }
 
     public function midtrans_callback()

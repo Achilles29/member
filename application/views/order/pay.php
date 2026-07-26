@@ -1,3 +1,10 @@
+<?php
+$order_base_path = $order_base_path ?? 'order';
+$order_storage_suffix = $order_storage_suffix ?? ('self_' . (int) ($this->session->userdata('order_meja_id') ?? 0));
+$cash_payment_label = $cash_payment_label ?? 'Bayar di kasir';
+$payment_hint = $payment_hint ?? 'Pilih metode pembayaran. Default: bayar di kasir. QRIS via Midtrans.';
+$catatan_placeholder = $catatan_placeholder ?? 'Contoh: tanpa es, kurang manis, dll.';
+?>
 <div class="page-content nm-page nm-order">
   <div class="nm-topbar nm-topbar--mini">
     <div>
@@ -27,18 +34,18 @@
       <strong>Rp <?= number_format((float) ($total ?? 0), 0, ',', '.') ?></strong>
     </div>
     <div class="nm-order__hint">
-      Pilih metode pembayaran. Default: bayar di kasir. QRIS via Midtrans.
+      <?= html_escape($payment_hint) ?>
     </div>
   </div>
 
-  <form method="post" action="<?= base_url('order/confirm') ?>">
+  <form method="post" action="<?= base_url($order_base_path . '/confirm') ?>">
     <div class="nm-card">
       <div class="nm-form">
         <div class="nm-form__label">Metode pembayaran</div>
 
         <label class="nm-radio">
           <input type="radio" name="payment_method" value="KASIR" checked>
-          <span>Bayar di kasir</span>
+          <span><?= html_escape($cash_payment_label) ?></span>
         </label>
 
         <?php if (!empty($qris_enabled)): ?>
@@ -53,13 +60,13 @@
         <?php endif; ?>
 
         <div class="nm-form__label" style="margin-top:14px;">Catatan (opsional)</div>
-        <textarea name="catatan" rows="3" placeholder="Contoh: tanpa es, kurang manis, dll."></textarea>
+        <textarea name="catatan" rows="3" placeholder="<?= html_escape($catatan_placeholder) ?>"></textarea>
       </div>
     </div>
 
     <div class="nm-card">
       <button type="submit" class="nm-btn nm-btn--primary nm-btn--block">Kirim Pesanan</button>
-      <a class="nm-btn nm-btn--ghost nm-btn--block" href="<?= base_url('order/review_session') ?>">Kembali</a>
+      <a class="nm-btn nm-btn--ghost nm-btn--block" href="<?= base_url($order_base_path . '/review_session') ?>">Kembali</a>
     </div>
   </form>
 
@@ -68,8 +75,8 @@
 
 <script>
   (function () {
-    const MEJA_ID = <?= (int) ($this->session->userdata('order_meja_id') ?? 0) ?>;
-    const STEP_KEY = 'nm_order_step_v1_' + String(MEJA_ID || 0);
+    const STORAGE_SUFFIX = <?= json_encode((string) $order_storage_suffix) ?>;
+    const STEP_KEY = 'nm_order_step_v1_' + STORAGE_SUFFIX;
     try { localStorage.setItem(STEP_KEY, 'pay'); } catch (_) {}
   })();
 </script>

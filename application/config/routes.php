@@ -6,6 +6,9 @@ $route['default_controller'] = 'member';
 
 $route['meja/(:num)'] = 'meja/index/$1';
 $route['meja/(:num)/(:any)'] = 'meja/index/$1/$2';
+$route['online-order'] = 'online_order';
+$route['online-order/(:any)'] = 'online_order/$1';
+$route['online-order/(:any)/(:num)'] = 'online_order/$1/$2';
 
 $route['admin'] = 'admin/login';
 $route['customer/(:num)'] = 'Customer/show/$1';

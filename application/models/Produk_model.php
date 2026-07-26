@@ -26,16 +26,21 @@ class Produk_model extends CI_Model {
         $this->db->join($availabilitySub, 'pac.product_id = p.id', 'left', false);
     }
 
-    private function base_query($outlet_id = 0)
+    private function base_query($outlet_id = 0, $visibility_context = 'self_order')
     {
         $hasSelfOrderFlag = $this->db->field_exists('show_in_self_order', 'mst_product');
+        $hasOnlineFoodFlag = $this->db->field_exists('show_online_food', 'mst_product');
+        $hasOnlineFoodPrice = $this->db->field_exists('online_food_price', 'mst_product');
         $hasShowMember = $this->db->field_exists('show_member', 'mst_product');
         $hasProductCode = $this->db->field_exists('product_code', 'mst_product');
+        $priceExpr = ($visibility_context === 'online_food' && $hasOnlineFoodPrice)
+            ? 'COALESCE(NULLIF(p.online_food_price, 0), p.selling_price)'
+            : 'p.selling_price';
 
         $this->db->select('
             p.id,
             p.product_name AS nama_produk,
-            p.selling_price AS harga_jual,
+            ' . $priceExpr . ' AS harga_jual,
             p.photo_path AS foto,
             p.description AS deskripsi,
             ' . ($hasProductCode ? 'p.product_code,' : 'NULL AS product_code,') . '
@@ -66,7 +71,11 @@ class Produk_model extends CI_Model {
         if ($hasShowMember) {
             $this->db->where('p.show_member', 1);
         }
-        if ($hasSelfOrderFlag) {
+        if ($visibility_context === 'online_food' && $hasOnlineFoodFlag) {
+            $this->db->where('p.show_online_food', 1);
+        } elseif ($visibility_context === 'online_food') {
+            $this->db->where('p.show_pos', 1);
+        } elseif ($hasSelfOrderFlag) {
             $this->db->where('p.show_in_self_order', 1);
         } else {
             $this->db->where('p.show_pos', 1);
@@ -84,16 +93,16 @@ class Produk_model extends CI_Model {
         $this->db->order_by('p.id', 'ASC');
     }
 
-    public function get_all($outlet_id = 0) {
-        $this->base_query($outlet_id);
+    public function get_all($outlet_id = 0, $visibility_context = 'self_order') {
+        $this->base_query($outlet_id, $visibility_context);
         $this->db->order_by('c.sort_order', 'ASC');
         $this->apply_product_order();
 
         return $this->db->get()->result();
     }
 
-    public function get_by_kategori($kategori_id = null, $outlet_id = 0) {
-        $this->base_query($outlet_id);
+    public function get_by_kategori($kategori_id = null, $outlet_id = 0, $visibility_context = 'self_order') {
+        $this->base_query($outlet_id, $visibility_context);
         if ($kategori_id) {
             $this->db->where('p.product_category_id', $kategori_id);
         }
@@ -102,8 +111,8 @@ class Produk_model extends CI_Model {
         return $this->db->get()->result();
     }
     
-	public function search($keyword = null, $kategori_id = null, $outlet_id = 0) {
-	    $this->base_query($outlet_id);
+	public function search($keyword = null, $kategori_id = null, $outlet_id = 0, $visibility_context = 'self_order') {
+	    $this->base_query($outlet_id, $visibility_context);
 	    if ($kategori_id) {
 	        $this->db->where('p.product_category_id', $kategori_id);
 	    }
@@ -115,9 +124,9 @@ class Produk_model extends CI_Model {
 	    return $this->db->get()->result();
 	}
 
-    public function get_by_id($product_id, $outlet_id = 0)
+    public function get_by_id($product_id, $outlet_id = 0, $visibility_context = 'self_order')
     {
-        $this->base_query($outlet_id);
+        $this->base_query($outlet_id, $visibility_context);
         $this->db->where('p.id', (int) $product_id);
         return $this->db->limit(1)->get()->row();
     }

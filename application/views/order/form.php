@@ -1,6 +1,8 @@
 <?php
-// Framework7-based order UI — redesigned premium look.
-// Cart disimpan ke session (AJAX: order/save_cart) + localStorage (anti hilang kalau tab ditutup).
+// Framework7-based order UI.
+$order_base_path = $order_base_path ?? 'order';
+$order_storage_suffix = $order_storage_suffix ?? ('self_' . (int) ($meja_id ?? 0));
+$is_online_order = !empty($is_online_order);
 ?>
 
 <div class="page-content nm-page nm-order">
@@ -9,9 +11,11 @@
   <div class="nm-order-hero">
     <div class="nm-order-hero__top">
       <div>
-        <div class="nm-order-hero__title">☕ Menu</div>
+        <div class="nm-order-hero__title"><?= $is_online_order ? 'Online Order' : 'Menu' ?></div>
         <div class="nm-order-hero__sub">
-          <?php if (!empty($nomor_meja)): ?>
+          <?php if ($is_online_order): ?>
+            Pilih menu untuk delivery
+          <?php elseif (!empty($nomor_meja)): ?>
             Meja <?= html_escape($nomor_meja) ?> — yuk pilih favoritmu!
           <?php else: ?>
             Pilih menu favoritmu
@@ -295,7 +299,10 @@
 <script>
   (function () {
     const BASE_URL = <?= json_encode(base_url(), JSON_UNESCAPED_SLASHES) ?>;
+    const ORDER_PATH = <?= json_encode(trim($order_base_path, '/'), JSON_UNESCAPED_SLASHES) ?>;
+    const ORDER_URL = BASE_URL + ORDER_PATH + '/';
     const MEJA_ID = <?= (int) ($meja_id ?? 0) ?>;
+    const STORAGE_SUFFIX = <?= json_encode((string) $order_storage_suffix) ?>;
     const SERVER_DRAFT = <?= json_encode(is_array($draft_cart ?? null) ? $draft_cart : [], JSON_UNESCAPED_SLASHES) ?>;
     const SERVER_STEP = <?= json_encode((string) ($flow_step ?? 'menu')) ?>;
     const EXTRA_LOOKUP = <?= json_encode(array_values(array_map(static function ($ex) {
@@ -306,8 +313,8 @@
       ];
     }, (array)($extras ?? []))), JSON_UNESCAPED_SLASHES) ?>;
 
-    const CART_KEY = 'nm_order_cart_v1_' + String(MEJA_ID || 0);
-    const STEP_KEY = 'nm_order_step_v1_' + String(MEJA_ID || 0);
+    const CART_KEY = 'nm_order_cart_v1_' + STORAGE_SUFFIX;
+    const STEP_KEY = 'nm_order_step_v1_' + STORAGE_SUFFIX;
 
     const elSearch = document.getElementById('nmSearch');
     const elProduk = document.getElementById('nmProduk');
@@ -448,7 +455,7 @@
     const saveServer = async (forceStep) => {
       const payload = { cart: toServerCart(), step: forceStep || step };
       try {
-        const res = await fetch(BASE_URL + 'order/save_cart', {
+        const res = await fetch(ORDER_URL + 'save_cart', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -578,12 +585,12 @@
 
       if (step === 'pay') {
         await saveServer('pay');
-        window.location.href = BASE_URL + 'order/pay';
+        window.location.href = ORDER_URL + 'pay';
         return;
       }
       if (step === 'review') {
         await saveServer('review');
-        window.location.href = BASE_URL + 'order/review_session';
+        window.location.href = ORDER_URL + 'review_session';
         return;
       }
     };
@@ -757,7 +764,7 @@
     const fetchExtraGroups = async (produkId) => {
       try {
         const res = await fetch(
-          BASE_URL + 'order/get_extra_options_produk?produk_id=' + encodeURIComponent(String(produkId)),
+          ORDER_URL + 'get_extra_options_produk?produk_id=' + encodeURIComponent(String(produkId)),
           { credentials: 'same-origin' }
         );
         if (!res.ok) return [];
@@ -972,7 +979,7 @@
       saveLocal();
       const saved = await saveServer('review');
       if (!saved) return;
-      window.location.href = BASE_URL + 'order/review_session';
+      window.location.href = ORDER_URL + 'review_session';
     });
 
     // ── Category emoji auto-assignment ────────────────────────────────────────

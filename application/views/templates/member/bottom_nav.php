@@ -5,6 +5,8 @@ $self_order_available = $ci->db->table_exists('crm_member')
   && $ci->db->table_exists('pos_order')
   && $ci->db->table_exists('pos_order_line')
   && $ci->db->table_exists('pos_payment');
+$has_self_order_context = (int) ($ci->session->userdata('order_meja_id') ?? 0) > 0
+  || trim((string) ($ci->session->userdata('order_nomor_meja') ?? '')) !== '';
 ?>
 <div class="toolbar tabbar tabbar-labels toolbar-bottom nm-tabbar">
   <div class="toolbar-inner">
@@ -14,10 +16,15 @@ $self_order_available = $ci->db->table_exists('crm_member')
       <span class="tabbar-label">Home</span>
     </a>
 
-    <?php if ($self_order_available): ?>
+    <?php if ($self_order_available && $has_self_order_context): ?>
     <a href="<?= site_url('order') ?>" class="tab-link <?= ($active_menu ?? '') === 'order' ? 'tab-link-active' : '' ?>">
       <i class="f7-icons">cart</i>
       <span class="tabbar-label">Order</span>
+    </a>
+    <?php elseif ($self_order_available): ?>
+    <a href="<?= site_url('online-order') ?>" class="tab-link <?= ($active_menu ?? '') === 'online_order' ? 'tab-link-active' : '' ?>">
+      <i class="f7-icons">bag</i>
+      <span class="tabbar-label">Online</span>
     </a>
     <?php endif; ?>
 

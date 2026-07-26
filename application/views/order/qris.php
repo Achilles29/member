@@ -1,3 +1,4 @@
+<?php $order_base_path = $order_base_path ?? 'order'; ?>
 <div class="page-content nm-page nm-order">
   <div class="nm-topbar nm-topbar--mini">
     <div>
@@ -82,9 +83,9 @@
       <a class="nm-btn nm-btn--primary nm-btn--block" href="#" id="qris-check">Cek status pembayaran</a>
     <?php endif; ?>
     <?php if (!$is_rejected_order && (in_array(strtoupper((string) ($payment_status ?? '')), ['EXPIRED', 'FAILED'], true) || !$has_qr)): ?>
-      <a class="nm-btn nm-btn--ghost nm-btn--block" href="<?= base_url('order/qris_regenerate/' . (int) ($order['id'] ?? 0)) ?>">Buat QR baru</a>
+      <a class="nm-btn nm-btn--ghost nm-btn--block" href="<?= base_url($order_base_path . '/qris_regenerate/' . (int) ($order['id'] ?? 0)) ?>">Buat QR baru</a>
     <?php endif; ?>
-    <a class="nm-btn nm-btn--ghost nm-btn--block" href="<?= base_url($is_rejected_order ? 'order' : 'order/pay') ?>"><?= $is_rejected_order ? 'Kembali ke Menu' : 'Kembali' ?></a>
+    <a class="nm-btn nm-btn--ghost nm-btn--block" href="<?= base_url($order_base_path . ($is_rejected_order ? '' : '/pay')) ?>"><?= $is_rejected_order ? 'Kembali ke Menu' : 'Kembali' ?></a>
   </div>
 
   <?php $this->load->view('templates/member/bottom_nav'); ?>
@@ -102,7 +103,7 @@
       if (isChecking) return;
       isChecking = true;
       try {
-        const res = await fetch('<?= base_url('order/qris_status/') ?>' + orderId, { credentials: 'same-origin' });
+        const res = await fetch('<?= base_url($order_base_path . '/qris_status/') ?>' + orderId, { credentials: 'same-origin' });
         const data = await res.json();
         if (data && data.ok) {
           const status = String(data.status || '').toUpperCase();
@@ -112,7 +113,7 @@
           }
           if (statusEl) statusEl.textContent = status || 'PENDING';
           if (status === 'PAID') {
-            window.location.href = '<?= base_url('order/selesai') ?>';
+            window.location.href = '<?= base_url($order_base_path . '/selesai') ?>';
             return;
           }
         }

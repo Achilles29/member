@@ -1,3 +1,4 @@
+<?php $order_base_path = $order_base_path ?? 'order'; ?>
 <div class="page-content nm-page nm-order">
   <div class="nm-topbar nm-topbar--mini">
     <div>
@@ -27,10 +28,10 @@
   </div>
 
   <div class="nm-card">
-    <a class="nm-btn nm-btn--primary nm-btn--block" href="<?= base_url('order/qris_simulate_paid/' . (int) ($order['id'] ?? 0)) ?>">
+    <a class="nm-btn nm-btn--primary nm-btn--block" href="<?= base_url($order_base_path . '/qris_simulate_paid/' . (int) ($order['id'] ?? 0)) ?>">
       Simulasikan: Pembayaran Berhasil
     </a>
-    <a class="nm-btn nm-btn--ghost nm-btn--block" href="<?= base_url('order/pay') ?>">Kembali</a>
+    <a class="nm-btn nm-btn--ghost nm-btn--block" href="<?= base_url($order_base_path . '/pay') ?>">Kembali</a>
   </div>
 
   <?php $this->load->view('templates/member/bottom_nav'); ?>

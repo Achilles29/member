@@ -1,3 +1,7 @@
+<?php
+$order_base_path = $order_base_path ?? 'order';
+$order_storage_suffix = $order_storage_suffix ?? ('self_' . (int) ($this->session->userdata('order_meja_id') ?? 0));
+?>
 <div class="page-content nm-page nm-order">
   <div class="nm-topbar nm-topbar--mini">
     <div>
@@ -51,8 +55,8 @@
       <strong>Rp <?= number_format((float) ($total ?? 0), 0, ',', '.') ?></strong>
     </div>
     <div class="nm-order__reviewActions">
-      <a class="nm-btn nm-btn--ghost" id="nmAddMenu" href="<?= base_url('order/menu') ?>">Tambah menu</a>
-      <a class="nm-btn nm-btn--primary" href="<?= base_url('order/pay') ?>">Bayar</a>
+      <a class="nm-btn nm-btn--ghost" id="nmAddMenu" href="<?= base_url($order_base_path . '/menu') ?>">Tambah menu</a>
+      <a class="nm-btn nm-btn--primary" href="<?= base_url($order_base_path . '/pay') ?>">Bayar</a>
     </div>
   </div>
 
@@ -62,8 +66,8 @@
 <script>
   (function () {
     // Mark step di localStorage supaya scan ulang bisa langsung balik ke tahap ini/pay.
-    const MEJA_ID = <?= (int) ($this->session->userdata('order_meja_id') ?? 0) ?>;
-    const STEP_KEY = 'nm_order_step_v1_' + String(MEJA_ID || 0);
+    const STORAGE_SUFFIX = <?= json_encode((string) $order_storage_suffix) ?>;
+    const STEP_KEY = 'nm_order_step_v1_' + STORAGE_SUFFIX;
 
     try { localStorage.setItem(STEP_KEY, 'review'); } catch (_) {}
 

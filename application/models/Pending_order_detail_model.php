@@ -28,7 +28,7 @@ class Pending_order_detail_model extends CI_Model {
         return 'AUTO';
     }
 
-    public function insert_detail($order_id, $produk_id, $jumlah, $catatan = null) {
+    public function insert_detail($order_id, $produk_id, $jumlah, $catatan = null, $unit_price = null) {
         $produk = $this->db->get_where('mst_product', ['id' => (int) $produk_id])->row();
         if (!$produk) {
             return 0;
@@ -44,7 +44,7 @@ class Pending_order_detail_model extends CI_Model {
             return 0;
         }
 
-        $harga = (float) ($produk->selling_price ?? 0);
+        $harga = $unit_price !== null ? (float) $unit_price : (float) ($produk->selling_price ?? 0);
         $hpp_snapshot = $produk->hpp_live_cache !== null
             ? (float) $produk->hpp_live_cache
             : (float) ($produk->hpp_standard ?? 0);

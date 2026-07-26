@@ -656,7 +656,9 @@ class Pending_order_model extends CI_Model {
         $payment_provider = null,
         $payment_ref = null,
         $payment_paid_at = null,
-        $table_id = 0
+        $table_id = 0,
+        $order_channel = 'SELF_ORDER',
+        $service_type = null
     ) {
         $now = $this->now();
         $grand_total = round((float) $total_penjualan, 2);
@@ -664,13 +666,21 @@ class Pending_order_model extends CI_Model {
         if (!in_array($payment_method, ['KASIR', 'QRIS'], true)) {
             $payment_method = 'KASIR';
         }
+        $order_channel = strtoupper(trim((string) $order_channel));
+        if (!in_array($order_channel, ['CASHIER', 'SELF_ORDER', 'RESERVATION', 'DELIVERY'], true)) {
+            $order_channel = 'SELF_ORDER';
+        }
+        $service_type = strtoupper(trim((string) $service_type));
+        if (!in_array($service_type, ['DINE_IN', 'TAKE_AWAY', 'DELIVERY', 'PICKUP'], true)) {
+            $service_type = $nomor_meja ? 'DINE_IN' : 'TAKE_AWAY';
+        }
         $context = $this->resolve_self_order_context($table_id, $nomor_meja);
 
         $data = [
             'order_no' => $this->generate_order_no(),
-            'order_channel' => 'SELF_ORDER',
+            'order_channel' => $order_channel,
             'order_scope' => 'REGULAR',
-            'service_type' => $nomor_meja ? 'DINE_IN' : 'TAKE_AWAY',
+            'service_type' => $service_type,
             'outlet_id' => (int) ($context['outlet_id'] ?? $this->resolve_default_outlet_id()),
             'terminal_id' => !empty($context['terminal_id']) ? (int) $context['terminal_id'] : null,
             'shift_id' => !empty($context['shift_id']) ? (int) $context['shift_id'] : null,

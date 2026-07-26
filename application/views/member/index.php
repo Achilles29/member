@@ -7,6 +7,8 @@
       && $ci->db->table_exists('pos_order')
       && $ci->db->table_exists('pos_order_line')
       && $ci->db->table_exists('pos_payment');
+    $has_self_order_context = (int) ($ci->session->userdata('order_meja_id') ?? 0) > 0
+      || trim((string) ($ci->session->userdata('order_nomor_meja') ?? '')) !== '';
 
     if (!empty($stamp_list) && is_array($stamp_list)) {
       foreach ($stamp_list as $s) {
@@ -105,9 +107,9 @@
       <span>Stamp</span>
     </a>
     <?php if ($self_order_available): ?>
-    <a class="nm-action" href="<?= site_url('order') ?>">
+    <a class="nm-action" href="<?= site_url($has_self_order_context ? 'order' : 'online-order') ?>">
       <div class="ico ico--purple"><i class="f7-icons">cart</i></div>
-      <span>Order</span>
+      <span><?= $has_self_order_context ? 'Order' : 'Online' ?></span>
     </a>
     <?php endif; ?>
     <a class="nm-action" href="<?= site_url('redeem') ?>">
