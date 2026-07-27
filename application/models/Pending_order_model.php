@@ -200,9 +200,12 @@ class Pending_order_model extends CI_Model {
             ->row_array();
     }
 
-    private function resolve_self_order_qris_payment_method_id()
+    private function resolve_self_order_qris_payment_method_id($order_channel = 'SELF_ORDER')
     {
         $qris_tables = [];
+        if (strtoupper(trim((string) $order_channel)) === 'DELIVERY' && $this->db->table_exists('pos_online_food_setting')) {
+            $qris_tables[] = 'pos_online_food_setting';
+        }
         if ($this->db->table_exists('pos_self_order_qris_setting')) {
             $qris_tables[] = 'pos_self_order_qris_setting';
         }
@@ -236,12 +239,12 @@ class Pending_order_model extends CI_Model {
         return 0;
     }
 
-    private function resolve_payment_method_id($payment_method)
+    private function resolve_payment_method_id($payment_method, $order_channel = 'SELF_ORDER')
     {
         $payment_method = strtoupper(trim((string) $payment_method));
 
         if ($payment_method === 'QRIS') {
-            $configured_method_id = $this->resolve_self_order_qris_payment_method_id();
+            $configured_method_id = $this->resolve_self_order_qris_payment_method_id($order_channel);
             if ($configured_method_id > 0) {
                 return $configured_method_id;
             }
@@ -542,7 +545,7 @@ class Pending_order_model extends CI_Model {
         $payment_status = $this->map_payment_status($payment_status_label);
         $paid_at = $fields['payment_paid_at'] ?? ($payment['paid_at'] ?? null);
         $notes = $this->encode_payment_meta($fields, $meta);
-        $payment_method_id = $this->resolve_payment_method_id($payment_method);
+        $payment_method_id = $this->resolve_payment_method_id($payment_method, $order['order_channel'] ?? 'SELF_ORDER');
         $payment_method_row = $this->get_payment_method_row($payment_method_id);
 
         $payment_payload = [

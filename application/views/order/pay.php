@@ -4,6 +4,9 @@ $order_storage_suffix = $order_storage_suffix ?? ('self_' . (int) ($this->sessio
 $cash_payment_label = $cash_payment_label ?? 'Bayar di kasir';
 $payment_hint = $payment_hint ?? 'Pilih metode pembayaran. Default: bayar di kasir. QRIS via Midtrans.';
 $catatan_placeholder = $catatan_placeholder ?? 'Contoh: tanpa es, kurang manis, dll.';
+$selected_payment_method = strtoupper((string) ($payment_method ?? 'KASIR'));
+$manual_payment_enabled = $manual_payment_enabled ?? true;
+$manual_payment_instructions = trim((string) ($manual_payment_instructions ?? ''));
 ?>
 <div class="page-content nm-page nm-order">
   <div class="nm-topbar nm-topbar--mini">
@@ -43,19 +46,26 @@ $catatan_placeholder = $catatan_placeholder ?? 'Contoh: tanpa es, kurang manis, 
       <div class="nm-form">
         <div class="nm-form__label">Metode pembayaran</div>
 
-        <label class="nm-radio">
-          <input type="radio" name="payment_method" value="KASIR" checked>
-          <span><?= html_escape($cash_payment_label) ?></span>
-        </label>
+        <?php if (!empty($manual_payment_enabled)): ?>
+          <label class="nm-radio">
+            <input type="radio" name="payment_method" value="KASIR" <?= $selected_payment_method === 'KASIR' ? 'checked' : '' ?>>
+            <span><?= html_escape($cash_payment_label) ?></span>
+          </label>
+          <?php if ($manual_payment_instructions !== ''): ?>
+            <div class="nm-order__hint" style="margin-top:8px;">
+              <?= nl2br(html_escape($manual_payment_instructions)) ?>
+            </div>
+          <?php endif; ?>
+        <?php endif; ?>
 
         <?php if (!empty($qris_enabled)): ?>
           <label class="nm-radio">
-            <input type="radio" name="payment_method" value="QRIS">
+            <input type="radio" name="payment_method" value="QRIS" <?= $selected_payment_method === 'QRIS' ? 'checked' : '' ?>>
             <span>QRIS</span>
           </label>
         <?php else: ?>
           <div class="nm-order__hint" style="margin-top:8px;">
-            QRIS sedang nonaktif. Silakan bayar di kasir.
+            <?= !empty($is_online_order) ? 'QRIS sedang nonaktif. Silakan konfirmasi manual ke admin.' : 'QRIS sedang nonaktif. Silakan bayar di kasir.' ?>
           </div>
         <?php endif; ?>
 

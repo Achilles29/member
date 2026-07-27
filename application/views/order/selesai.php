@@ -39,7 +39,11 @@ $is_online_order = !empty($is_online_order);
   </div>
 
   <div class="nm-card">
-    <a class="nm-btn nm-btn--primary nm-btn--block" href="<?= base_url($order_base_path) ?>">Order lagi</a>
+    <?php $show_manual_wa = $is_online_order && strtoupper((string) ($payment_method ?? '')) !== 'QRIS' && !empty($manual_whatsapp_url); ?>
+    <?php if ($show_manual_wa): ?>
+      <a class="nm-btn nm-btn--primary nm-btn--block" href="<?= html_escape((string) $manual_whatsapp_url) ?>" target="_blank" rel="noopener">Konfirmasi ke Admin via WhatsApp</a>
+    <?php endif; ?>
+    <a class="nm-btn <?= $show_manual_wa ? 'nm-btn--ghost' : 'nm-btn--primary' ?> nm-btn--block" href="<?= base_url($order_base_path) ?>">Order lagi</a>
   </div>
 
   <?php $this->load->view('templates/member/bottom_nav'); ?>

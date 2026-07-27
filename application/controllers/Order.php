@@ -176,6 +176,62 @@ class Order extends CI_Controller
         ], $data);
     }
 
+    private function online_food_settings()
+    {
+        $settings = [
+            'payment_default' => 'MANUAL',
+            'payment_auto_enabled' => 0,
+            'payment_manual_enabled' => 1,
+            'manual_whatsapp_number' => '',
+            'manual_whatsapp_template' => 'Halo admin, saya ingin konfirmasi order online food {order_no}.',
+            'manual_payment_instructions' => '',
+            'midtrans_server_key' => '',
+            'midtrans_client_key' => '',
+            'midtrans_is_production' => 0,
+        ];
+
+        if ($this->db->table_exists('pos_online_food_setting')) {
+            $row = $this->db->get_where('pos_online_food_setting', ['id' => 1])->row_array();
+            if ($row) {
+                foreach ($settings as $key => $default) {
+                    if (array_key_exists($key, $row)) {
+                        $settings[$key] = $row[$key];
+                    }
+                }
+            }
+        }
+
+        return $settings;
+    }
+
+    private function online_food_whatsapp_url(array $pending_order = [])
+    {
+        $settings = $this->online_food_settings();
+        $phone = preg_replace('/\D+/', '', (string) ($settings['manual_whatsapp_number'] ?? ''));
+        if ($phone === '') {
+            return '';
+        }
+        if (strpos($phone, '0') === 0) {
+            $phone = '62' . substr($phone, 1);
+        }
+
+        $order_no = (string) ($pending_order['order_no'] ?? '');
+        if ($order_no === '' && !empty($pending_order['id'])) {
+            $order_no = '#' . (int) $pending_order['id'];
+        }
+        $template = trim((string) ($settings['manual_whatsapp_template'] ?? ''));
+        if ($template === '') {
+            $template = 'Halo admin, saya ingin konfirmasi order online food {order_no}.';
+        }
+        $message = str_replace(
+            ['{order_no}', '{order_id}', '{total}'],
+            [$order_no, (string) ($pending_order['id'] ?? ''), number_format((float) ($pending_order['grand_total'] ?? 0), 0, ',', '.')],
+            $template
+        );
+
+        return 'https://wa.me/' . $phone . '?text=' . rawurlencode($message);
+    }
+
     private function midtrans_config()
     {
         $cfg = [
@@ -186,7 +242,9 @@ class Order extends CI_Controller
         ];
 
         $qrisTable = null;
-        if ($this->db->table_exists('pos_self_order_qris_setting')) {
+        if ($this->is_online_order_flow() && $this->db->table_exists('pos_online_food_setting')) {
+            $qrisTable = 'pos_online_food_setting';
+        } elseif ($this->db->table_exists('pos_self_order_qris_setting')) {
             $qrisTable = 'pos_self_order_qris_setting';
         } elseif ($this->db->table_exists('pr_qris_setting')) {
             $qrisTable = 'pr_qris_setting';
@@ -198,7 +256,9 @@ class Order extends CI_Controller
                 $cfg['server_key'] = (string) ($row['midtrans_server_key'] ?? '');
                 $cfg['client_key'] = (string) ($row['midtrans_client_key'] ?? '');
                 $cfg['is_production'] = !empty($row['midtrans_is_production']);
-                $cfg['is_enabled'] = ((int) ($row['is_enabled'] ?? 0)) === 1;
+                $cfg['is_enabled'] = $this->is_online_order_flow()
+                    ? ((int) ($row['payment_auto_enabled'] ?? 0)) === 1
+                    : ((int) ($row['is_enabled'] ?? 0)) === 1;
             }
         }
 
@@ -1001,6 +1061,9 @@ class Order extends CI_Controller
         $pending_id = (int) ($this->order_session('last_pending_order_id') ?? 0);
         if ($pending_id > 0) {
             $data['pending_order'] = $this->Pending_order_model->get_for_member($pending_id, (int) $customer_id);
+            if ($this->is_online_order_flow() && strtoupper((string) $data['payment_method']) === 'KASIR') {
+                $data['manual_whatsapp_url'] = $this->online_food_whatsapp_url((array) $data['pending_order']);
+            }
         }
 
         $this->load->view('templates/member/header', $data);
@@ -1144,16 +1207,32 @@ class Order extends CI_Controller
         // Mark step buat resume (scan ulang langsung balik ke halaman pay).
         $this->set_order_session('flow_step', 'pay');
 
+        $onlineSettings = $this->is_online_order_flow() ? $this->online_food_settings() : [];
+        $manualPaymentEnabled = $this->is_online_order_flow()
+            ? ((int) ($onlineSettings['payment_manual_enabled'] ?? 1) === 1)
+            : true;
+        $qrisPaymentEnabled = $this->is_online_order_flow()
+            ? (((int) ($onlineSettings['payment_auto_enabled'] ?? 0) === 1) && $this->midtrans_is_configured())
+            : $this->midtrans_is_configured();
+        $defaultPaymentMethod = strtoupper((string) ($onlineSettings['payment_default'] ?? 'MANUAL')) === 'AUTO' && $qrisPaymentEnabled
+            ? 'QRIS'
+            : 'KASIR';
+        if (!$manualPaymentEnabled && $qrisPaymentEnabled) {
+            $defaultPaymentMethod = 'QRIS';
+        }
+
         $data = $this->order_view_data([
             'title' => $this->is_online_order_flow() ? 'Pembayaran Online Order' : 'Pembayaran',
             'total' => (float) $this->order_session('total'),
             'nomor_meja' => $this->is_self_order_flow() ? $this->session->userdata('order_nomor_meja') : null,
-            'payment_method' => 'KASIR',
-            'qris_enabled' => $this->midtrans_is_configured(),
-            'cash_payment_label' => $this->is_online_order_flow() ? 'Bayar saat diterima' : 'Bayar di kasir',
+            'payment_method' => $defaultPaymentMethod,
+            'manual_payment_enabled' => $manualPaymentEnabled,
+            'qris_enabled' => $qrisPaymentEnabled,
+            'cash_payment_label' => $this->is_online_order_flow() ? 'Manual admin / konfirmasi WA' : 'Bayar di kasir',
             'payment_hint' => $this->is_online_order_flow()
-                ? 'Pilih metode pembayaran. Ongkir berdasarkan jarak akan ditambahkan pada tahap berikutnya.'
+                ? 'Pilih pembayaran otomatis QRIS atau manual admin. Ongkir berdasarkan jarak akan ditambahkan pada tahap berikutnya.'
                 : 'Pilih metode pembayaran. Default: bayar di kasir. QRIS via Midtrans.',
+            'manual_payment_instructions' => (string) ($onlineSettings['manual_payment_instructions'] ?? ''),
             'catatan_placeholder' => $this->is_online_order_flow()
                 ? 'Contoh: alamat lengkap, patokan, atau instruksi pengantaran.'
                 : 'Contoh: tanpa es, kurang manis, dll.',
@@ -1200,6 +1279,17 @@ class Order extends CI_Controller
         $payment_method = strtoupper(trim((string) $this->input->post('payment_method', true)));
         if (!in_array($payment_method, ['KASIR', 'QRIS'], true)) {
             $payment_method = 'KASIR';
+        }
+        $onlineSettings = $this->is_online_order_flow() ? $this->online_food_settings() : [];
+        if ($this->is_online_order_flow()) {
+            $manualEnabled = (int) ($onlineSettings['payment_manual_enabled'] ?? 1) === 1;
+            $autoEnabled = (int) ($onlineSettings['payment_auto_enabled'] ?? 0) === 1;
+            if ($payment_method === 'KASIR' && !$manualEnabled && $autoEnabled) {
+                $payment_method = 'QRIS';
+            }
+            if ($payment_method === 'QRIS' && !$autoEnabled && $manualEnabled) {
+                $payment_method = 'KASIR';
+            }
         }
         if ($payment_method === 'QRIS' && !$this->midtrans_is_configured()) {
             $payment_method = 'KASIR';
