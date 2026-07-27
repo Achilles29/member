@@ -42,6 +42,11 @@ $manual_payment_instructions = trim((string) ($manual_payment_instructions ?? ''
   </div>
 
   <form method="post" action="<?= base_url($order_base_path . '/confirm') ?>">
+    <?php if (!empty($is_online_order)): ?>
+      <input type="hidden" name="customer_lat" id="customer_lat">
+      <input type="hidden" name="customer_lng" id="customer_lng">
+      <input type="hidden" name="customer_location_accuracy" id="customer_location_accuracy">
+    <?php endif; ?>
     <div class="nm-card">
       <div class="nm-form">
         <div class="nm-form__label">Metode pembayaran</div>
@@ -81,12 +86,42 @@ $manual_payment_instructions = trim((string) ($manual_payment_instructions ?? ''
   </form>
 
   <?php $this->load->view('templates/member/bottom_nav'); ?>
+  <?php if (!empty($is_online_order)) $this->load->view('order/_online_whatsapp_float'); ?>
 </div>
 
 <script>
   (function () {
     const STORAGE_SUFFIX = <?= json_encode((string) $order_storage_suffix) ?>;
+    const IS_ONLINE_ORDER = <?= !empty($is_online_order) ? 'true' : 'false' ?>;
     const STEP_KEY = 'nm_order_step_v1_' + STORAGE_SUFFIX;
+    const LOCATION_KEY = 'nm_order_location_v1_' + STORAGE_SUFFIX;
     try { localStorage.setItem(STEP_KEY, 'pay'); } catch (_) {}
+    if (!IS_ONLINE_ORDER) return;
+    const form = document.querySelector('form');
+    const latEl = document.getElementById('customer_lat');
+    const lngEl = document.getElementById('customer_lng');
+    const accEl = document.getElementById('customer_location_accuracy');
+    function fillLocation() {
+      try {
+        const loc = JSON.parse(localStorage.getItem(LOCATION_KEY) || 'null');
+        const lat = Number(loc && loc.lat);
+        const lng = Number(loc && loc.lng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false;
+        latEl.value = String(lat);
+        lngEl.value = String(lng);
+        accEl.value = String(Number(loc.accuracy || 0));
+        return true;
+      } catch (_) {
+        return false;
+      }
+    }
+    fillLocation();
+    if (form) {
+      form.addEventListener('submit', function (event) {
+        if (fillLocation()) return;
+        event.preventDefault();
+        alert('Lokasi wajib aktif untuk online order. Kembali ke halaman review/menu lalu aktifkan lokasi.');
+      });
+    }
   })();
 </script>

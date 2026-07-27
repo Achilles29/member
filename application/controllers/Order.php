@@ -167,13 +167,17 @@ class Order extends CI_Controller
 
     private function order_view_data(array $data = [])
     {
-        return array_merge([
+        $base = [
             'order_mode' => $this->order_mode,
             'is_online_order' => $this->is_online_order_flow(),
             'order_base_path' => $this->order_base_path(),
             'order_storage_suffix' => $this->is_online_order_flow() ? 'online' : 'self_' . (int) ($this->session->userdata('order_meja_id') ?? 0),
             'active_menu' => $this->is_online_order_flow() ? 'online_order' : 'order',
-        ], $data);
+        ];
+        if ($this->is_online_order_flow() && !array_key_exists('manual_whatsapp_url', $data)) {
+            $base['manual_whatsapp_url'] = $this->online_food_whatsapp_url([]);
+        }
+        return array_merge($base, $data);
     }
 
     private function online_food_settings()
@@ -183,8 +187,8 @@ class Order extends CI_Controller
             'payment_auto_enabled' => 0,
             'payment_manual_enabled' => 1,
             'manual_whatsapp_number' => '',
-            'manual_whatsapp_template' => 'Halo admin, saya ingin konfirmasi order online food {order_no}.',
-            'manual_payment_instructions' => '',
+            'manual_whatsapp_template' => 'Halo admin, saya mau konfirmasi pesanan Online Food {order_no} dengan total Rp {total}. Mohon dibantu untuk metode pembayaran manual/COD dan estimasi pengantarannya.',
+            'manual_payment_instructions' => 'Untuk pembayaran manual, hubungi admin melalui tombol WhatsApp. Setelah admin mengonfirmasi pesanan, kasir akan memproses order dan pembayaran dilakukan melalui POS.',
             'midtrans_server_key' => '',
             'midtrans_client_key' => '',
             'midtrans_is_production' => 0,
@@ -230,6 +234,26 @@ class Order extends CI_Controller
         );
 
         return 'https://wa.me/' . $phone . '?text=' . rawurlencode($message);
+    }
+
+    private function online_customer_location_from_post()
+    {
+        $lat = trim((string) $this->input->post('customer_lat', true));
+        $lng = trim((string) $this->input->post('customer_lng', true));
+        $accuracy = trim((string) $this->input->post('customer_location_accuracy', true));
+        if ($lat === '' || $lng === '' || !is_numeric($lat) || !is_numeric($lng)) {
+            return null;
+        }
+        $latFloat = (float) $lat;
+        $lngFloat = (float) $lng;
+        if ($latFloat < -90 || $latFloat > 90 || $lngFloat < -180 || $lngFloat > 180) {
+            return null;
+        }
+        return [
+            'lat' => $latFloat,
+            'lng' => $lngFloat,
+            'accuracy' => is_numeric($accuracy) ? max(0, (float) $accuracy) : 0,
+        ];
     }
 
     private function midtrans_config()
@@ -1276,6 +1300,19 @@ class Order extends CI_Controller
         $nomor_meja = $this->is_self_order_flow() ? $this->session->userdata('order_nomor_meja') : null;
         $table_id = $this->is_self_order_flow() ? (int) $this->session->userdata('order_meja_id') : 0;
         $catatan = $this->input->post('catatan', true);
+        if ($this->is_online_order_flow()) {
+            $customerLocation = $this->online_customer_location_from_post();
+            if (!$customerLocation) {
+                $this->session->set_flashdata('error', 'Lokasi wajib aktif untuk online order. Izinkan lokasi lalu kirim ulang pesanan.');
+                $this->redirect_order('pay');
+                return;
+            }
+            $locationNote = 'Lokasi customer: ' . number_format((float) $customerLocation['lat'], 7, '.', '') . ',' . number_format((float) $customerLocation['lng'], 7, '.', '');
+            if (!empty($customerLocation['accuracy'])) {
+                $locationNote .= ' akurasi ' . number_format((float) $customerLocation['accuracy'], 0, ',', '.') . 'm';
+            }
+            $catatan = trim((string) $catatan . ((string) $catatan !== '' ? "\n" : '') . $locationNote);
+        }
         $payment_method = strtoupper(trim((string) $this->input->post('payment_method', true)));
         if (!in_array($payment_method, ['KASIR', 'QRIS'], true)) {
             $payment_method = 'KASIR';

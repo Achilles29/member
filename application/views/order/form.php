@@ -44,6 +44,13 @@ $is_online_order = !empty($is_online_order);
     </div>
   <?php endif; ?>
 
+  <?php if ($is_online_order): ?>
+    <div class="nm-card" id="nmLocationGate" style="margin-top:8px;">
+      <div class="nm-order__hint" id="nmLocationStatus">Aktifkan lokasi untuk menghitung jarak dan ongkir delivery.</div>
+      <button type="button" class="nm-btn nm-btn--primary nm-btn--block" id="nmEnableLocation" style="margin-top:10px;">Aktifkan Lokasi</button>
+    </div>
+  <?php endif; ?>
+
   <!-- Sticky header: search + category tabs (one block, zero gap) -->
   <div class="nm-order__stickyhead">
     <div class="nm-order__search">
@@ -294,6 +301,7 @@ $is_online_order = !empty($is_online_order);
   </div>
 
   <?php $this->load->view('templates/member/bottom_nav'); ?>
+  <?php if ($is_online_order) $this->load->view('order/_online_whatsapp_float'); ?>
 </div>
 
 <script>
@@ -302,6 +310,7 @@ $is_online_order = !empty($is_online_order);
     const ORDER_PATH = <?= json_encode(trim($order_base_path, '/'), JSON_UNESCAPED_SLASHES) ?>;
     const ORDER_URL = BASE_URL + ORDER_PATH + '/';
     const MEJA_ID = <?= (int) ($meja_id ?? 0) ?>;
+    const IS_ONLINE_ORDER = <?= $is_online_order ? 'true' : 'false' ?>;
     const STORAGE_SUFFIX = <?= json_encode((string) $order_storage_suffix) ?>;
     const SERVER_DRAFT = <?= json_encode(is_array($draft_cart ?? null) ? $draft_cart : [], JSON_UNESCAPED_SLASHES) ?>;
     const SERVER_STEP = <?= json_encode((string) ($flow_step ?? 'menu')) ?>;
@@ -315,6 +324,7 @@ $is_online_order = !empty($is_online_order);
 
     const CART_KEY = 'nm_order_cart_v1_' + STORAGE_SUFFIX;
     const STEP_KEY = 'nm_order_step_v1_' + STORAGE_SUFFIX;
+    const LOCATION_KEY = 'nm_order_location_v1_' + STORAGE_SUFFIX;
 
     const elSearch = document.getElementById('nmSearch');
     const elProduk = document.getElementById('nmProduk');
@@ -396,6 +406,7 @@ $is_online_order = !empty($is_online_order);
     // Bentuk: { [produk_id]: { produk_id, jumlah, extra_ids } }
     let cart = {};
     let step = 'menu';
+    let customerLocation = null;
 
     const loadLocal = () => {
       try {
@@ -414,6 +425,62 @@ $is_online_order = !empty($is_online_order);
         localStorage.setItem(STEP_KEY, step);
       } catch (_) {}
     };
+
+    const loadLocation = () => {
+      if (!IS_ONLINE_ORDER) return null;
+      try {
+        const parsed = JSON.parse(localStorage.getItem(LOCATION_KEY) || 'null');
+        const lat = Number(parsed && parsed.lat);
+        const lng = Number(parsed && parsed.lng);
+        if (Number.isFinite(lat) && Number.isFinite(lng)) {
+          return { lat, lng, accuracy: Number(parsed.accuracy || 0), at: parsed.at || '' };
+        }
+      } catch (_) {}
+      return null;
+    };
+
+    const saveLocation = (loc) => {
+      customerLocation = loc;
+      try { localStorage.setItem(LOCATION_KEY, JSON.stringify(loc)); } catch (_) {}
+      updateLocationGate();
+    };
+
+    const updateLocationGate = () => {
+      if (!IS_ONLINE_ORDER) return;
+      const gate = document.getElementById('nmLocationGate');
+      const status = document.getElementById('nmLocationStatus');
+      if (!gate || !status) return;
+      if (customerLocation && Number.isFinite(Number(customerLocation.lat)) && Number.isFinite(Number(customerLocation.lng))) {
+        gate.style.display = 'none';
+        return;
+      }
+      gate.style.display = '';
+      status.textContent = 'Aktifkan lokasi untuk menghitung jarak dan ongkir delivery.';
+    };
+
+    const requestLocation = () => new Promise((resolve) => {
+      if (!IS_ONLINE_ORDER) { resolve(true); return; }
+      if (customerLocation) { resolve(true); return; }
+      const status = document.getElementById('nmLocationStatus');
+      if (!navigator.geolocation) {
+        if (status) status.textContent = 'Browser tidak mendukung lokasi. Gunakan browser lain untuk online order.';
+        resolve(false);
+        return;
+      }
+      if (status) status.textContent = 'Mengambil lokasi kamu...';
+      navigator.geolocation.getCurrentPosition((pos) => {
+        saveLocation({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracy: pos.coords.accuracy || 0,
+          at: new Date().toISOString()
+        });
+        resolve(true);
+      }, () => {
+        if (status) status.textContent = 'Lokasi wajib aktif untuk online order. Izinkan akses lokasi lalu coba lagi.';
+        resolve(false);
+      }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
+    });
 
     const mergeServerDraft = (serverDraft) => {
       // serverDraft dari CI: { produk_id: {jumlah, extra_ids} }
@@ -572,6 +639,12 @@ $is_online_order = !empty($is_online_order);
 
     // Init cart: merge server + local (local wins).
     const local = loadLocal();
+    customerLocation = loadLocation();
+    updateLocationGate();
+    const locationButton = document.getElementById('nmEnableLocation');
+    if (locationButton) {
+      locationButton.addEventListener('click', () => { requestLocation(); });
+    }
     const fromServer = mergeServerDraft(SERVER_DRAFT);
     cart = Object.assign({}, fromServer, (local.cart && typeof local.cart === 'object' ? local.cart : {}));
     step = (local.step || SERVER_STEP || 'menu');
@@ -975,6 +1048,7 @@ $is_online_order = !empty($is_online_order);
 
     document.getElementById('nmToReview').addEventListener('click', async () => {
       if (Object.keys(cart).length === 0) return;
+      if (!(await requestLocation())) return;
       step = 'review';
       saveLocal();
       const saved = await saveServer('review');
