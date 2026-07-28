@@ -24,17 +24,18 @@ $storage_suffix = $order_storage_suffix ?? 'online';
   .nm-address-actions { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-top:10px; }
   .nm-address-empty { padding:18px 12px; text-align:center; color:var(--muted); font-size:13px; font-weight:800; }
   .nm-address-popup[hidden] { display:none; }
-  .nm-address-popup { position:fixed; inset:0; z-index:100000; }
+  .nm-address-popup { position:fixed; inset:0; z-index:1000000; }
   .nm-address-popup__backdrop { position:absolute; inset:0; background:rgba(17,24,39,.45); }
   .nm-address-popup__panel {
     position:absolute;
     left:50%;
     transform:translateX(-50%);
-    bottom:calc(env(safe-area-inset-bottom, 0px));
+    top:calc(env(safe-area-inset-top, 0px) + 8px);
+    bottom:calc(var(--nm-bottom-ui) + env(safe-area-inset-bottom, 0px) + 8px);
     width:calc(100% - 16px);
     max-width:404px;
-    height:min(92dvh, calc(100dvh - 14px));
-    max-height:min(92dvh, calc(100dvh - 14px));
+    height:auto;
+    max-height:none;
     overflow:hidden;
     display:flex;
     flex-direction:column;
@@ -43,12 +44,17 @@ $storage_suffix = $order_storage_suffix ?? 'online';
     box-shadow:var(--shadow);
   }
   @supports not (height: 1dvh) {
-    .nm-address-popup__panel { height:88vh; max-height:88vh; }
+    .nm-address-popup__panel {
+      top:8px;
+      bottom:100px;
+    }
   }
   .nm-address-popup__head { padding:14px 14px 10px; display:flex; justify-content:space-between; align-items:center; gap:10px; border-bottom:1px solid #f3f4f6; }
   .nm-address-popup__title { font-weight:1000; font-size:15px; }
-  .nm-address-popup__body { padding:14px; overflow:auto; -webkit-overflow-scrolling:touch; display:grid; gap:10px; min-height:0; }
+  #nmAddressForm { display:flex; flex-direction:column; flex:1; min-height:0; }
+  .nm-address-popup__body { flex:1; padding:14px; overflow:auto; -webkit-overflow-scrolling:touch; display:grid; gap:10px; min-height:0; overscroll-behavior:contain; }
   .nm-address-popup__foot {
+    flex-shrink:0;
     padding:12px 14px calc(14px + env(safe-area-inset-bottom, 0px));
     border-top:1px solid #f3f4f6;
     display:grid;
