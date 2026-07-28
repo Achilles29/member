@@ -37,7 +37,7 @@ class Order extends CI_Controller
                 return;
             }
 
-            if (!$this->self_order_is_enabled()) {
+            if ($this->is_self_order_flow() && !$this->self_order_is_enabled()) {
                 if ($this->input->is_ajax_request()) {
                     $this->json_response([
                         'ok' => false,
@@ -63,6 +63,30 @@ class Order extends CI_Controller
                 redirect('member');
             }
 
+            if ($this->is_online_order_flow() && !$this->online_order_method_allowed_when_closed($this->router->method)) {
+                $availability = $this->online_food_availability();
+                if (empty($availability['is_open'])) {
+                    if ($this->input->is_ajax_request()) {
+                        $this->json_response([
+                            'ok' => false,
+                            'message' => (string) ($availability['message'] ?? 'Online order sedang tutup.')
+                        ], 503);
+                        return;
+                    }
+
+                    $data = $this->order_view_data([
+                        'title' => 'Online Order Tutup',
+                        'message' => (string) ($availability['message'] ?? 'Online order sedang tutup.'),
+                        'next_open_hint' => (string) ($availability['next_open_hint'] ?? ''),
+                    ]);
+                    $this->load->view('templates/member/header', $data);
+                    $this->load->view('order/closed', $data);
+                    $this->load->view('templates/member/footer', $data);
+                    $this->output->_display();
+                    exit;
+                }
+            }
+
             if ($this->is_self_order_flow() && !$this->has_self_order_context()) {
                 if ($this->input->is_ajax_request()) {
                     $this->json_response([
@@ -85,6 +109,15 @@ class Order extends CI_Controller
             ->set_output(json_encode($payload));
     }
 
+    private function nullable_text($value)
+    {
+        if ($value === null) {
+            return null;
+        }
+        $text = trim((string) $value);
+        return $text === '' ? null : $text;
+    }
+
     private function self_order_is_enabled()
     {
         if ($this->db->table_exists('pos_self_order_setting')) {
@@ -94,6 +127,67 @@ class Order extends CI_Controller
             }
         }
         return true;
+    }
+
+    private function online_order_method_allowed_when_closed($method)
+    {
+        return in_array((string) $method, ['qris', 'qris_status', 'selesai', 'midtrans_callback'], true);
+    }
+
+    private function online_food_availability()
+    {
+        $settings = $this->online_food_settings();
+        if ((int) ($settings['is_enabled'] ?? 1) !== 1) {
+            return [
+                'is_open' => false,
+                'message' => 'Online order sedang dinonaktifkan sementara.',
+                'next_open_hint' => '',
+            ];
+        }
+
+        $openMode = strtoupper((string) ($settings['open_mode'] ?? 'MANUAL'));
+        if ($openMode !== 'SCHEDULE') {
+            $isOpen = strtoupper((string) ($settings['manual_status'] ?? 'OPEN')) === 'OPEN';
+            return [
+                'is_open' => $isOpen,
+                'message' => $isOpen ? '' : 'Online order sedang tutup.',
+                'next_open_hint' => '',
+            ];
+        }
+
+        $timezone = trim((string) ($settings['timezone'] ?? 'Asia/Jakarta')) ?: 'Asia/Jakarta';
+        try {
+            $now = new DateTime('now', new DateTimeZone($timezone));
+        } catch (Throwable $e) {
+            $now = new DateTime('now', new DateTimeZone('Asia/Jakarta'));
+        }
+        $day = $now->format('w');
+        $days = array_values(array_filter(array_map('trim', explode(',', (string) ($settings['schedule_days'] ?? '1,2,3,4,5,6,0')))));
+        $openTime = substr((string) ($settings['open_time'] ?? '08:00'), 0, 5);
+        $closeTime = substr((string) ($settings['close_time'] ?? '22:00'), 0, 5);
+        $currentMinutes = ((int) $now->format('H')) * 60 + (int) $now->format('i');
+        $openMinutes = $this->online_time_to_minutes($openTime, 480);
+        $closeMinutes = $this->online_time_to_minutes($closeTime, 1320);
+        $dayAllowed = in_array($day, $days, true);
+        $timeAllowed = $openMinutes <= $closeMinutes
+            ? ($currentMinutes >= $openMinutes && $currentMinutes <= $closeMinutes)
+            : ($currentMinutes >= $openMinutes || $currentMinutes <= $closeMinutes);
+        $isOpen = $dayAllowed && $timeAllowed;
+
+        return [
+            'is_open' => $isOpen,
+            'message' => $isOpen ? '' : 'Online order sedang tutup.',
+            'next_open_hint' => 'Jam operasional online order: ' . $openTime . ' - ' . $closeTime . ' (' . $timezone . ').',
+        ];
+    }
+
+    private function online_time_to_minutes($value, $fallback)
+    {
+        $parts = explode(':', (string) $value);
+        if (count($parts) < 2 || !is_numeric($parts[0]) || !is_numeric($parts[1])) {
+            return (int) $fallback;
+        }
+        return max(0, min(1439, ((int) $parts[0]) * 60 + (int) $parts[1]));
     }
 
     private function is_self_order_flow()
@@ -183,6 +277,13 @@ class Order extends CI_Controller
     private function online_food_settings()
     {
         $settings = [
+            'is_enabled' => 1,
+            'open_mode' => 'MANUAL',
+            'manual_status' => 'OPEN',
+            'timezone' => 'Asia/Jakarta',
+            'open_time' => '08:00',
+            'close_time' => '22:00',
+            'schedule_days' => '1,2,3,4,5,6,0',
             'payment_default' => 'MANUAL',
             'payment_auto_enabled' => 0,
             'payment_manual_enabled' => 1,
@@ -192,6 +293,18 @@ class Order extends CI_Controller
             'midtrans_server_key' => '',
             'midtrans_client_key' => '',
             'midtrans_is_production' => 0,
+            'delivery_fee_mode' => 'DISTANCE',
+            'delivery_flat_fee' => 0,
+            'delivery_base_fee' => 5000,
+            'delivery_base_km' => 2,
+            'delivery_per_km_fee' => 2500,
+            'delivery_min_fee' => 5000,
+            'delivery_max_distance_km' => 10,
+            'free_delivery_min_order' => 0,
+            'free_delivery_distance_km' => 0,
+            'delivery_fee_charge_mode' => 'CUSTOMER_TO_DRIVER',
+            'outlet_lat' => '',
+            'outlet_lng' => '',
         ];
 
         if ($this->db->table_exists('pos_online_food_setting')) {
@@ -241,6 +354,11 @@ class Order extends CI_Controller
         $lat = trim((string) $this->input->post('customer_lat', true));
         $lng = trim((string) $this->input->post('customer_lng', true));
         $accuracy = trim((string) $this->input->post('customer_location_accuracy', true));
+        return $this->online_location_from_values($lat, $lng, $accuracy);
+    }
+
+    private function online_location_from_values($lat, $lng, $accuracy = 0)
+    {
         if ($lat === '' || $lng === '' || !is_numeric($lat) || !is_numeric($lng)) {
             return null;
         }
@@ -253,6 +371,226 @@ class Order extends CI_Controller
             'lat' => $latFloat,
             'lng' => $lngFloat,
             'accuracy' => is_numeric($accuracy) ? max(0, (float) $accuracy) : 0,
+        ];
+    }
+
+    private function member_delivery_locations($member_id)
+    {
+        $member_id = (int) $member_id;
+        if ($member_id <= 0 || !$this->db->table_exists('crm_member_delivery_location')) {
+            return [];
+        }
+
+        return $this->db
+            ->select('id, label, recipient_name, recipient_phone, address, address_note, latitude, longitude, location_accuracy, is_default, free_delivery_enabled, free_delivery_reason')
+            ->from('crm_member_delivery_location')
+            ->where('member_id', $member_id)
+            ->order_by('is_default', 'DESC')
+            ->order_by('last_used_at', 'DESC')
+            ->order_by('id', 'DESC')
+            ->limit(10)
+            ->get()
+            ->result_array();
+    }
+
+    private function member_delivery_location($member_id, $location_id)
+    {
+        $member_id = (int) $member_id;
+        $location_id = (int) $location_id;
+        if ($member_id <= 0 || $location_id <= 0 || !$this->db->table_exists('crm_member_delivery_location')) {
+            return [];
+        }
+
+        return $this->db
+            ->from('crm_member_delivery_location')
+            ->where('id', $location_id)
+            ->where('member_id', $member_id)
+            ->limit(1)
+            ->get()
+            ->row_array() ?: [];
+    }
+
+    private function save_member_delivery_location($member_id, array $quote, array $payload)
+    {
+        $member_id = (int) $member_id;
+        if ($member_id <= 0 || !$this->db->table_exists('crm_member_delivery_location')) {
+            return 0;
+        }
+
+        $label = trim((string) ($payload['location_label'] ?? ''));
+        if ($label === '') {
+            $label = 'Alamat';
+        }
+        $existingId = (int) ($payload['saved_location_id'] ?? 0);
+        $row = [
+            'member_id' => $member_id,
+            'label' => substr($label, 0, 80),
+            'recipient_name' => $this->nullable_text($payload['recipient_name'] ?? ''),
+            'recipient_phone' => $this->nullable_text($payload['recipient_phone'] ?? ''),
+            'address' => substr(trim((string) ($quote['address'] ?? '')), 0, 255),
+            'address_note' => $this->nullable_text(substr(trim((string) ($payload['address_note'] ?? '')), 0, 255)),
+            'latitude' => round((float) ($quote['customer_lat'] ?? 0), 7),
+            'longitude' => round((float) ($quote['customer_lng'] ?? 0), 7),
+            'location_accuracy' => round((float) ($quote['customer_location_accuracy'] ?? 0), 2),
+            'last_used_at' => date('Y-m-d H:i:s'),
+        ];
+        if ($row['address'] === '' || abs((float) $row['latitude']) > 90 || abs((float) $row['longitude']) > 180) {
+            return 0;
+        }
+
+        $existing = $this->member_delivery_location($member_id, $existingId);
+        if ($existing) {
+            $this->db->where('id', $existingId)->where('member_id', $member_id)->update('crm_member_delivery_location', $row);
+            return $existingId;
+        }
+
+        $row['is_default'] = count($this->member_delivery_locations($member_id)) === 0 ? 1 : 0;
+        $this->db->insert('crm_member_delivery_location', $row);
+        return (int) $this->db->insert_id();
+    }
+
+    private function online_haversine_km($lat1, $lng1, $lat2, $lng2)
+    {
+        $earthRadiusKm = 6371;
+        $dLat = deg2rad((float) $lat2 - (float) $lat1);
+        $dLng = deg2rad((float) $lng2 - (float) $lng1);
+        $a = sin($dLat / 2) * sin($dLat / 2)
+            + cos(deg2rad((float) $lat1)) * cos(deg2rad((float) $lat2))
+            * sin($dLng / 2) * sin($dLng / 2);
+        return $earthRadiusKm * (2 * atan2(sqrt($a), sqrt(1 - $a)));
+    }
+
+    private function online_osrm_route($outletLat, $outletLng, $customerLat, $customerLng)
+    {
+        if (!function_exists('curl_init')) {
+            return null;
+        }
+        $url = 'https://router.project-osrm.org/route/v1/driving/'
+            . number_format((float) $outletLng, 7, '.', '') . ',' . number_format((float) $outletLat, 7, '.', '')
+            . ';'
+            . number_format((float) $customerLng, 7, '.', '') . ',' . number_format((float) $customerLat, 7, '.', '')
+            . '?overview=full&geometries=geojson&steps=false&alternatives=false';
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Accept: application/json']);
+        $body = curl_exec($ch);
+        $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        if ($body === false || $code < 200 || $code >= 300) {
+            return null;
+        }
+        $json = json_decode((string) $body, true);
+        $route = $json['routes'][0] ?? null;
+        if (!is_array($route)) {
+            return null;
+        }
+        return [
+            'distance_km' => max(0, (float) ($route['distance'] ?? 0) / 1000),
+            'duration_min' => max(0, (float) ($route['duration'] ?? 0) / 60),
+            'geometry' => $route['geometry'] ?? null,
+        ];
+    }
+
+    private function online_delivery_quote(array $location, $subtotal = 0, $address = '')
+    {
+        $settings = $this->online_food_settings();
+        $outletLat = $settings['outlet_lat'] ?? '';
+        $outletLng = $settings['outlet_lng'] ?? '';
+        if ($outletLat === '' || $outletLng === '' || !is_numeric($outletLat) || !is_numeric($outletLng)) {
+            return ['ok' => false, 'message' => 'Koordinat outlet online food belum diatur. Hubungi admin.'];
+        }
+
+        $customerLat = (float) $location['lat'];
+        $customerLng = (float) $location['lng'];
+        $straightKm = $this->online_haversine_km((float) $outletLat, (float) $outletLng, $customerLat, $customerLng);
+        $route = $this->online_osrm_route((float) $outletLat, (float) $outletLng, $customerLat, $customerLng);
+        $routeKm = is_array($route) ? (float) ($route['distance_km'] ?? 0) : 0;
+        $distanceKm = $routeKm > 0 ? $routeKm : $straightKm;
+        $maxKm = max(0, (float) ($settings['delivery_max_distance_km'] ?? 0));
+        if ($maxKm > 0 && $distanceKm > $maxKm) {
+            return [
+                'ok' => false,
+                'message' => 'Lokasi kamu di luar radius delivery saat ini.',
+                'distance_km' => round($distanceKm, 3),
+                'max_distance_km' => round($maxKm, 2),
+            ];
+        }
+
+        $subtotal = max(0, round((float) $subtotal, 2));
+        $mode = strtoupper((string) ($settings['delivery_fee_mode'] ?? 'DISTANCE'));
+        $freeMin = max(0, (float) ($settings['free_delivery_min_order'] ?? 0));
+        $freeDistanceKm = max(0, (float) ($settings['free_delivery_distance_km'] ?? 0));
+        $feePaidBy = 'CUSTOMER';
+        $freeReason = '';
+        if (!empty($location['free_delivery_enabled'])) {
+            $fee = 0;
+            $feePaidBy = 'FREE';
+            $freeReason = trim((string) ($location['free_delivery_reason'] ?? 'Langganan'));
+        } elseif ($freeDistanceKm > 0 && $distanceKm <= $freeDistanceKm) {
+            $fee = 0;
+            $feePaidBy = 'FREE';
+            $freeReason = 'Jarak terjangkau';
+        } elseif ($freeMin > 0 && $subtotal >= $freeMin) {
+            $fee = 0;
+            $feePaidBy = 'FREE';
+            $freeReason = 'Minimum belanja';
+        } elseif ($mode === 'FLAT') {
+            $fee = max(0, (float) ($settings['delivery_flat_fee'] ?? 0));
+        } else {
+            $baseFee = max(0, (float) ($settings['delivery_base_fee'] ?? 0));
+            $baseKm = max(0, (float) ($settings['delivery_base_km'] ?? 0));
+            $perKmFee = max(0, (float) ($settings['delivery_per_km_fee'] ?? 0));
+            $minFee = max(0, (float) ($settings['delivery_min_fee'] ?? 0));
+            $fee = $baseFee + max(0, $distanceKm - $baseKm) * $perKmFee;
+            $fee = max($minFee, $fee);
+        }
+        $fee = ceil($fee / 500) * 500;
+        $chargeMode = strtoupper((string) ($settings['delivery_fee_charge_mode'] ?? 'CUSTOMER_TO_DRIVER'));
+        if (!in_array($chargeMode, ['CUSTOMER_TO_DRIVER', 'RECORD_ONLY', 'MERCHANT_COLLECT'], true)) {
+            $chargeMode = 'CUSTOMER_TO_DRIVER';
+        }
+
+        return [
+            'ok' => true,
+            'message' => '',
+            'subtotal' => $subtotal,
+            'delivery_fee' => round($fee, 2),
+            'estimated_delivery_fee' => round($fee, 2),
+            'grand_total' => $subtotal,
+            'customer_pay_total' => $subtotal,
+            'fee_charge_mode' => $chargeMode,
+            'fee_paid_by' => $feePaidBy,
+            'free_reason' => $freeReason,
+            'distance_km' => round($distanceKm, 3),
+            'straight_distance_km' => round($straightKm, 3),
+            'route_distance_km' => $routeKm > 0 ? round($routeKm, 3) : null,
+            'duration_min' => is_array($route) ? round((float) ($route['duration_min'] ?? 0), 1) : null,
+            'route_geojson' => is_array($route) ? ($route['geometry'] ?? null) : null,
+            'outlet_lat' => (float) $outletLat,
+            'outlet_lng' => (float) $outletLng,
+            'customer_lat' => $customerLat,
+            'customer_lng' => $customerLng,
+            'customer_location_accuracy' => (float) ($location['accuracy'] ?? 0),
+            'saved_location_id' => (int) ($location['saved_location_id'] ?? 0),
+            'recipient_name' => trim((string) ($location['recipient_name'] ?? '')),
+            'recipient_phone' => trim((string) ($location['recipient_phone'] ?? '')),
+            'address_note' => trim((string) ($location['address_note'] ?? '')),
+            'address' => trim((string) $address),
+            'source' => $routeKm > 0 ? 'ROUTE' : 'HAVERSINE',
+        ];
+    }
+
+    private function online_delivery_public_config()
+    {
+        $settings = $this->online_food_settings();
+        return [
+            'outlet_lat' => is_numeric($settings['outlet_lat'] ?? null) ? (float) $settings['outlet_lat'] : null,
+            'outlet_lng' => is_numeric($settings['outlet_lng'] ?? null) ? (float) $settings['outlet_lng'] : null,
+            'fee_charge_mode' => (string) ($settings['delivery_fee_charge_mode'] ?? 'CUSTOMER_TO_DRIVER'),
+            'free_delivery_distance_km' => (float) ($settings['free_delivery_distance_km'] ?? 0),
+            'free_delivery_min_order' => (float) ($settings['free_delivery_min_order'] ?? 0),
         ];
     }
 
@@ -486,7 +824,6 @@ class Order extends CI_Controller
                 ];
             }
         }
-
         return $items;
     }
 
@@ -902,13 +1239,89 @@ class Order extends CI_Controller
         $this->set_order_session('draft_cart', $cart);
         $this->set_order_session('draft_total', $total);
         $this->set_order_session('flow_step', $step);
+        if ($step === 'menu') {
+            $this->unset_order_session(['delivery_quote']);
+        }
 
         $this->json_response(['ok' => true, 'total' => $total]);
     }
 
+    public function delivery_quote()
+    {
+        if (!$this->is_online_order_flow()) {
+            $this->json_response(['ok' => false, 'message' => 'Ongkir hanya untuk online order.'], 400);
+            return;
+        }
+        $customer_id = (int) $this->session->userdata('member_id');
+
+        $lat = $this->input->post('customer_lat', true);
+        $lng = $this->input->post('customer_lng', true);
+        $accuracy = $this->input->post('customer_location_accuracy', true);
+        $address = trim((string) $this->input->post('customer_address', true));
+        $savedLocationId = (int) $this->input->post('saved_location_id', true);
+        $savedLocation = $this->member_delivery_location($customer_id, $savedLocationId);
+        if ($savedLocation) {
+            $lat = $savedLocation['latitude'] ?? $lat;
+            $lng = $savedLocation['longitude'] ?? $lng;
+            $accuracy = $savedLocation['location_accuracy'] ?? $accuracy;
+            $address = trim((string) ($savedLocation['address'] ?? $address));
+        }
+        $location = $this->online_location_from_values($lat, $lng, $accuracy);
+        if (!$location) {
+            $this->json_response(['ok' => false, 'message' => 'Lokasi customer tidak valid.'], 422);
+            return;
+        }
+        $location['saved_location_id'] = $savedLocation ? (int) $savedLocation['id'] : 0;
+        $location['recipient_name'] = trim((string) ($this->input->post('recipient_name', true) ?: ($savedLocation['recipient_name'] ?? '')));
+        $location['recipient_phone'] = trim((string) ($this->input->post('recipient_phone', true) ?: ($savedLocation['recipient_phone'] ?? '')));
+        $location['address_note'] = trim((string) ($this->input->post('address_note', true) ?: ($savedLocation['address_note'] ?? '')));
+        $location['free_delivery_enabled'] = !empty($savedLocation['free_delivery_enabled']);
+        $location['free_delivery_reason'] = trim((string) ($savedLocation['free_delivery_reason'] ?? ''));
+
+        $cart = $this->order_session('draft_cart');
+        if (empty($cart) || !is_array($cart)) {
+            $cart = $this->order_session('cart');
+        }
+        $cart = $this->normalize_cart($cart);
+        if (empty($cart)) {
+            $this->json_response(['ok' => false, 'message' => 'Keranjang kosong. Pilih menu dulu ya.'], 422);
+            return;
+        }
+
+        $availability = $this->validate_cart_product_availability($cart);
+        if (!$availability['ok']) {
+            $this->json_response(['ok' => false, 'message' => $availability['message']], 422);
+            return;
+        }
+
+        $subtotal = $this->compute_total_from_cart($cart);
+        $quote = $this->online_delivery_quote($location, $subtotal, $address);
+        if (empty($quote['ok'])) {
+            $this->unset_order_session(['delivery_quote']);
+            $this->json_response($quote, 422);
+            return;
+        }
+
+        $this->set_order_session('delivery_quote', $quote);
+        if ((int) $this->input->post('save_location', true) === 1) {
+            $newLocationId = $this->save_member_delivery_location($customer_id, $quote, [
+                'saved_location_id' => $savedLocationId,
+                'location_label' => $this->input->post('location_label', true),
+                'recipient_name' => $location['recipient_name'],
+                'recipient_phone' => $location['recipient_phone'],
+                'address_note' => $location['address_note'],
+            ]);
+            if ($newLocationId > 0) {
+                $quote['saved_location_id'] = $newLocationId;
+                $this->set_order_session('delivery_quote', $quote);
+            }
+        }
+        $this->json_response($quote);
+    }
+
     public function clear_cart()
     {
-        $this->unset_order_session(['draft_cart', 'draft_total', 'cart', 'total', 'flow_step']);
+        $this->unset_order_session(['draft_cart', 'draft_total', 'cart', 'total', 'flow_step', 'delivery_quote']);
 
         $this->redirect_order();
     }
@@ -918,7 +1331,7 @@ class Order extends CI_Controller
         // Bypass "resume" redirect supaya tombol "Tambah menu" dari review bisa balik ke list menu.
         // Keranjang draft tetap disimpan, tapi keranjang final di-reset agar total dihitung ulang saat confirm.
         $this->set_order_session('flow_step', 'menu');
-        $this->unset_order_session(['cart', 'total']);
+        $this->unset_order_session(['cart', 'total', 'delivery_quote']);
 
         $this->redirect_order();
     }
@@ -1137,6 +1550,9 @@ class Order extends CI_Controller
 
         $data['produk_list'] = $produk_list;
         $data['total'] = $total;
+        $data['delivery_quote'] = $this->is_online_order_flow() ? ($this->order_session('delivery_quote') ?: []) : [];
+        $data['saved_locations'] = $this->is_online_order_flow() ? $this->member_delivery_locations((int) $customer_id) : [];
+        $data['delivery_config'] = $this->is_online_order_flow() ? $this->online_delivery_public_config() : [];
         $data = $this->order_view_data(array_merge($data, [
             'title' => $this->is_online_order_flow() ? 'Review Online Order' : 'Review Order',
             'nomor_meja' => $this->is_self_order_flow() ? $this->session->userdata('order_nomor_meja') : null,
@@ -1193,6 +1609,9 @@ class Order extends CI_Controller
             'nomor_meja' => $this->is_self_order_flow() ? $this->session->userdata('order_nomor_meja') : null,
             'produk_list' => $produk_list,
             'total' => $total,
+            'delivery_quote' => $this->is_online_order_flow() ? ($this->order_session('delivery_quote') ?: []) : [],
+            'saved_locations' => $this->is_online_order_flow() ? $this->member_delivery_locations((int) $customer_id) : [],
+            'delivery_config' => $this->is_online_order_flow() ? $this->online_delivery_public_config() : [],
             'member' => $this->get_member_row($customer_id),
         ]);
 
@@ -1227,6 +1646,19 @@ class Order extends CI_Controller
             $this->redirect_order();
             return;
         }
+        $subtotal = $this->compute_total_from_cart($cart);
+        $deliveryQuote = [];
+        $total = $subtotal;
+        if ($this->is_online_order_flow()) {
+            $deliveryQuote = $this->order_session('delivery_quote');
+            if (empty($deliveryQuote) || !is_array($deliveryQuote) || empty($deliveryQuote['ok'])) {
+                $this->session->set_flashdata('error', 'Tentukan lokasi dan ongkir dulu sebelum memilih pembayaran.');
+                $this->redirect_order('review_session');
+                return;
+            }
+            $total = $subtotal;
+            $this->set_order_session('total', $total);
+        }
 
         // Mark step buat resume (scan ulang langsung balik ke halaman pay).
         $this->set_order_session('flow_step', 'pay');
@@ -1247,14 +1679,17 @@ class Order extends CI_Controller
 
         $data = $this->order_view_data([
             'title' => $this->is_online_order_flow() ? 'Pembayaran Online Order' : 'Pembayaran',
-            'total' => (float) $this->order_session('total'),
+            'subtotal' => $subtotal,
+            'delivery_quote' => $deliveryQuote,
+            'delivery_fee' => (float) ($deliveryQuote['delivery_fee'] ?? 0),
+            'total' => $total,
             'nomor_meja' => $this->is_self_order_flow() ? $this->session->userdata('order_nomor_meja') : null,
             'payment_method' => $defaultPaymentMethod,
             'manual_payment_enabled' => $manualPaymentEnabled,
             'qris_enabled' => $qrisPaymentEnabled,
             'cash_payment_label' => $this->is_online_order_flow() ? 'Manual admin / konfirmasi WA' : 'Bayar di kasir',
             'payment_hint' => $this->is_online_order_flow()
-                ? 'Pilih pembayaran otomatis QRIS atau manual admin. Ongkir berdasarkan jarak akan ditambahkan pada tahap berikutnya.'
+                ? 'Total POS hanya menu. Ongkir tercatat sebagai biaya delivery terpisah.'
                 : 'Pilih metode pembayaran. Default: bayar di kasir. QRIS via Midtrans.',
             'manual_payment_instructions' => (string) ($onlineSettings['manual_payment_instructions'] ?? ''),
             'catatan_placeholder' => $this->is_online_order_flow()
@@ -1300,18 +1735,58 @@ class Order extends CI_Controller
         $nomor_meja = $this->is_self_order_flow() ? $this->session->userdata('order_nomor_meja') : null;
         $table_id = $this->is_self_order_flow() ? (int) $this->session->userdata('order_meja_id') : 0;
         $catatan = $this->input->post('catatan', true);
+        $deliveryQuote = [];
         if ($this->is_online_order_flow()) {
+            $savedLocationId = (int) $this->input->post('saved_location_id', true);
+            $savedLocation = $this->member_delivery_location($customer_id, $savedLocationId);
+            if ($savedLocation) {
+                $_POST['customer_lat'] = $savedLocation['latitude'] ?? $_POST['customer_lat'] ?? null;
+                $_POST['customer_lng'] = $savedLocation['longitude'] ?? $_POST['customer_lng'] ?? null;
+                $_POST['customer_location_accuracy'] = $savedLocation['location_accuracy'] ?? $_POST['customer_location_accuracy'] ?? null;
+                $_POST['customer_address'] = $savedLocation['address'] ?? $_POST['customer_address'] ?? null;
+            }
             $customerLocation = $this->online_customer_location_from_post();
             if (!$customerLocation) {
                 $this->session->set_flashdata('error', 'Lokasi wajib aktif untuk online order. Izinkan lokasi lalu kirim ulang pesanan.');
                 $this->redirect_order('pay');
                 return;
             }
+            $customerLocation['saved_location_id'] = $savedLocation ? (int) $savedLocation['id'] : 0;
+            $customerLocation['recipient_name'] = trim((string) ($this->input->post('recipient_name', true) ?: ($savedLocation['recipient_name'] ?? '')));
+            $customerLocation['recipient_phone'] = trim((string) ($this->input->post('recipient_phone', true) ?: ($savedLocation['recipient_phone'] ?? '')));
+            $customerLocation['address_note'] = trim((string) ($this->input->post('address_note', true) ?: ($savedLocation['address_note'] ?? '')));
+            $customerLocation['free_delivery_enabled'] = !empty($savedLocation['free_delivery_enabled']);
+            $customerLocation['free_delivery_reason'] = trim((string) ($savedLocation['free_delivery_reason'] ?? ''));
+            $subtotalForQuote = $this->compute_total_from_cart($cart);
+            $deliveryQuote = $this->online_delivery_quote(
+                $customerLocation,
+                $subtotalForQuote,
+                trim((string) $this->input->post('customer_address', true))
+            );
+            if ($savedLocation) {
+                $this->db
+                    ->where('id', (int) $savedLocation['id'])
+                    ->where('member_id', $customer_id)
+                    ->update('crm_member_delivery_location', ['last_used_at' => date('Y-m-d H:i:s')]);
+            }
+            if (empty($deliveryQuote['ok'])) {
+                $this->session->set_flashdata('error', (string) ($deliveryQuote['message'] ?? 'Ongkir belum bisa dihitung. Pilih lokasi ulang.'));
+                $this->redirect_order('review_session');
+                return;
+            }
             $locationNote = 'Lokasi customer: ' . number_format((float) $customerLocation['lat'], 7, '.', '') . ',' . number_format((float) $customerLocation['lng'], 7, '.', '');
             if (!empty($customerLocation['accuracy'])) {
                 $locationNote .= ' akurasi ' . number_format((float) $customerLocation['accuracy'], 0, ',', '.') . 'm';
             }
+            if (!empty($deliveryQuote['address'])) {
+                $locationNote .= "\nAlamat/patokan: " . substr(trim((string) $deliveryQuote['address']), 0, 90);
+            }
+            $locationNote .= "\nOngkir: Rp " . number_format((float) ($deliveryQuote['delivery_fee'] ?? 0), 0, ',', '.')
+                . ' | Jarak: ' . number_format((float) ($deliveryQuote['distance_km'] ?? 0), 2, ',', '.') . ' km';
             $catatan = trim((string) $catatan . ((string) $catatan !== '' ? "\n" : '') . $locationNote);
+        }
+        if (strlen((string) $catatan) > 250) {
+            $catatan = substr((string) $catatan, 0, 250);
         }
         $payment_method = strtoupper(trim((string) $this->input->post('payment_method', true)));
         if (!in_array($payment_method, ['KASIR', 'QRIS'], true)) {
@@ -1355,7 +1830,8 @@ class Order extends CI_Controller
                 null,
                 $table_id,
                 $this->current_order_channel(),
-                $this->current_service_type($nomor_meja)
+                $this->current_service_type($nomor_meja),
+                $this->is_online_order_flow() ? $deliveryQuote : []
             );
 
             foreach ($cart as $produk_id => $row) {
@@ -1391,7 +1867,7 @@ class Order extends CI_Controller
             $this->set_order_session('last_pending_order_id', (int) $order_id);
             $this->set_order_session('last_pending_order_payment_method', $payment_method);
 
-            $this->unset_order_session(['cart', 'total', 'draft_cart', 'draft_total', 'flow_step']);
+            $this->unset_order_session(['cart', 'total', 'draft_cart', 'draft_total', 'flow_step', 'delivery_quote']);
 
             if ($payment_method === 'QRIS') {
                 $this->redirect_order('qris/' . (int) $order_id);

@@ -407,6 +407,7 @@ $is_online_order = !empty($is_online_order);
     let cart = {};
     let step = 'menu';
     let customerLocation = null;
+    let activeCategoryId = '';
 
     const loadLocal = () => {
       try {
@@ -597,6 +598,22 @@ $is_online_order = !empty($is_online_order);
       renderCartBar();
     };
 
+    const applyProductFilters = () => {
+      const q = String(elSearch && elSearch.value || '').trim().toLowerCase();
+      document.querySelectorAll('.nm-order__section').forEach((sec) => {
+        const sectionKatId = String(sec.getAttribute('data-kat-id') || '');
+        const categoryMatch = activeCategoryId === '' || sectionKatId === activeCategoryId;
+        let anyVisible = false;
+        sec.querySelectorAll('.nm-order__item').forEach((it) => {
+          const nm = (it.getAttribute('data-produk-nama') || '').toLowerCase();
+          const show = categoryMatch && (!q || nm.includes(q));
+          it.style.display = show ? '' : 'none';
+          if (show) anyVisible = true;
+        });
+        sec.style.display = (categoryMatch && anyVisible) ? '' : 'none';
+      });
+    };
+
     const openSheet = () => {
       // Track last state as "cart" (local only) so scan ulang bisa balik buka keranjang.
       step = 'cart';
@@ -695,6 +712,7 @@ $is_online_order = !empty($is_online_order);
       // IntersectionObserver: update active tab saat user scroll.
       if ('IntersectionObserver' in window) {
         const io = new IntersectionObserver((entries) => {
+          if (activeCategoryId !== '') return;
           const visible = entries
             .filter((e) => e.isIntersecting)
             .sort((a, b) => (b.intersectionRatio || 0) - (a.intersectionRatio || 0))[0];
@@ -747,11 +765,16 @@ $is_online_order = !empty($is_online_order);
       if (elCatList) elCatList.addEventListener('click', (e) => {
         const btn = e.target.closest('.nm-catitem');
         if (!btn) return;
-        const katId = btn.getAttribute('data-kat-id');
+        const katId = String(btn.getAttribute('data-kat-id') || '');
+        activeCategoryId = katId;
         setActiveTab(katId);
-        const sec = document.querySelector('.nm-order__section[data-kat-id="' + String(katId) + '"]');
+        applyProductFilters();
         closeCatSheet();
-        setTimeout(() => scrollToSection(sec), 50);
+        requestAnimationFrame(() => {
+          if (scrollContainer && typeof scrollContainer.scrollTo === 'function') {
+            scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
+          }
+        });
       });
 
       // ── Tab strip click ───────────────────────────────────────────────────
@@ -759,8 +782,10 @@ $is_online_order = !empty($is_online_order);
         elCatTabs.addEventListener('click', (e) => {
           const tab = e.target.closest('.nm-order__tab');
           if (!tab) return;
-          const katId = tab.getAttribute('data-kat-id');
+          const katId = String(tab.getAttribute('data-kat-id') || '');
+          activeCategoryId = katId;
           setActiveTab(katId);
+          applyProductFilters();
           if (katId) {
             const sec = document.querySelector('.nm-order__section[data-kat-id="' + String(katId) + '"]');
             setTimeout(() => scrollToSection(sec), 30);
@@ -796,13 +821,10 @@ $is_online_order = !empty($is_online_order);
         });
       }
 
-      // Init tab: highlight first category on page
-      const firstKatId = sections[0] ? sections[0].getAttribute('data-kat-id') : null;
-      if (firstKatId) {
-        setActiveTab(firstKatId);
-      } else {
-        setActiveTab('');
-      }
+      // Init tab: tampilkan semua menu.
+      activeCategoryId = '';
+      setActiveTab('');
+      applyProductFilters();
     })();
 
     // Save server on load (best-effort)
@@ -816,22 +838,7 @@ $is_online_order = !empty($is_online_order);
 
     // Search filter (menyaring item, bukan kategori)
     elSearch.addEventListener('input', () => {
-      const q = String(elSearch.value || '').trim().toLowerCase();
-      document.querySelectorAll('.nm-order__item').forEach((it) => {
-        const nm = (it.getAttribute('data-produk-nama') || '').toLowerCase();
-        it.style.display = (!q || nm.includes(q)) ? '' : 'none';
-      });
-
-      // Saat search, sembunyikan judul kategori biar tidak penuh layar.
-      document.querySelectorAll('.nm-section-head').forEach((h) => {
-        h.style.display = q ? 'none' : '';
-      });
-
-      // Sembunyikan section yang tidak punya item terlihat.
-      document.querySelectorAll('.nm-order__section').forEach((sec) => {
-        const anyVisible = Array.from(sec.querySelectorAll('.nm-order__item')).some((it) => it.style.display !== 'none');
-        sec.style.display = anyVisible ? '' : 'none';
-      });
+      applyProductFilters();
     });
 
     const fetchExtraGroups = async (produkId) => {

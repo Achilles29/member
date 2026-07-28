@@ -214,17 +214,18 @@ class Pending_order_model extends CI_Model {
         }
 
         foreach ($qris_tables as $table) {
-            if (!$this->db->field_exists('payment_method_id', $table)) {
+            $method_field = $table === 'pos_online_food_setting' ? 'qris_payment_method_id' : 'payment_method_id';
+            if (!$this->db->field_exists($method_field, $table)) {
                 continue;
             }
 
             $method_id = (int) $this->db
-                ->select('payment_method_id')
+                ->select($method_field)
                 ->from($table)
                 ->where('id', 1)
                 ->limit(1)
                 ->get()
-                ->row('payment_method_id');
+                ->row($method_field);
 
             if ($method_id <= 0) {
                 continue;
@@ -623,6 +624,7 @@ class Pending_order_model extends CI_Model {
         if (empty($order)) {
             return null;
         }
+        $delivery = $this->delivery_order_row((int) ($order['id'] ?? 0));
 
         $meta = $this->decode_payment_meta($payment['notes'] ?? '');
         $payment_method = strtoupper((string) ($meta['payment_method'] ?? 'KASIR'));
@@ -646,7 +648,33 @@ class Pending_order_model extends CI_Model {
             'payment_qr_string' => null,
             'order_no' => $order['order_no'] ?? null,
             'rejection_reason' => $this->get_rejection_reason((int) ($order['id'] ?? 0)),
+            'delivery_fee_amount' => (float) ($delivery['fee_amount'] ?? 0),
+            'delivery_estimated_fee_amount' => (float) ($delivery['estimated_fee_amount'] ?? 0),
+            'delivery_fee_charge_mode' => $delivery['fee_charge_mode'] ?? null,
+            'delivery_fee_paid_by' => $delivery['fee_paid_by'] ?? null,
+            'delivery_distance_km' => isset($delivery['distance_km']) ? (float) $delivery['distance_km'] : null,
+            'delivery_route_distance_km' => isset($delivery['route_distance_km']) ? (float) $delivery['route_distance_km'] : null,
+            'delivery_duration_min' => isset($delivery['duration_min']) ? (float) $delivery['duration_min'] : null,
+            'delivery_address' => $delivery['delivery_address'] ?? null,
+            'customer_lat' => isset($delivery['customer_lat']) ? (float) $delivery['customer_lat'] : null,
+            'customer_lng' => isset($delivery['customer_lng']) ? (float) $delivery['customer_lng'] : null,
+            'customer_location_accuracy' => isset($delivery['customer_location_accuracy']) ? (float) $delivery['customer_location_accuracy'] : null,
         ];
+    }
+
+    private function delivery_order_row($order_id)
+    {
+        $order_id = (int) $order_id;
+        if ($order_id <= 0 || !$this->db->table_exists('pos_online_food_delivery_order')) {
+            return [];
+        }
+
+        return $this->db
+            ->from('pos_online_food_delivery_order')
+            ->where('order_id', $order_id)
+            ->limit(1)
+            ->get()
+            ->row_array() ?: [];
     }
 
     public function create_order(
@@ -661,10 +689,12 @@ class Pending_order_model extends CI_Model {
         $payment_paid_at = null,
         $table_id = 0,
         $order_channel = 'SELF_ORDER',
-        $service_type = null
+        $service_type = null,
+        array $delivery_quote = []
     ) {
         $now = $this->now();
-        $grand_total = round((float) $total_penjualan, 2);
+        $subtotal = round((float) $total_penjualan, 2);
+        $grand_total = $subtotal;
         $payment_method = strtoupper(trim((string) $payment_method));
         if (!in_array($payment_method, ['KASIR', 'QRIS'], true)) {
             $payment_method = 'KASIR';
@@ -696,7 +726,7 @@ class Pending_order_model extends CI_Model {
             'ordered_at' => $now,
             'paid_at' => $payment_status === 'PAID' ? ($payment_paid_at ?: $now) : null,
             'guest_count' => 1,
-            'subtotal_amount' => $grand_total,
+            'subtotal_amount' => $subtotal,
             'discount_amount' => 0,
             'promo_amount' => 0,
             'voucher_amount' => 0,
@@ -718,6 +748,8 @@ class Pending_order_model extends CI_Model {
             return 0;
         }
 
+        $this->insert_online_food_delivery_order($order_id, (int) $customer_id, $delivery_quote);
+
         $this->ensure_payment_record(array_merge($data, ['id' => $order_id]), [
             'payment_method' => $payment_method,
             'payment_status' => $payment_status,
@@ -727,6 +759,50 @@ class Pending_order_model extends CI_Model {
         ]);
 
         return $order_id;
+    }
+
+    private function insert_online_food_delivery_order($order_id, $member_id, array $delivery_quote)
+    {
+        $order_id = (int) $order_id;
+        if ($order_id <= 0 || empty($delivery_quote) || !$this->db->table_exists('pos_online_food_delivery_order')) {
+            return;
+        }
+
+        $estimatedFee = max(0, round((float) ($delivery_quote['estimated_delivery_fee'] ?? $delivery_quote['delivery_fee'] ?? 0), 2));
+        $fee = max(0, round((float) ($delivery_quote['delivery_fee'] ?? 0), 2));
+        $paidBy = strtoupper((string) ($delivery_quote['fee_paid_by'] ?? ($fee <= 0 ? 'FREE' : 'CUSTOMER')));
+        if (!in_array($paidBy, ['CUSTOMER', 'MERCHANT', 'FREE'], true)) {
+            $paidBy = $fee <= 0 ? 'FREE' : 'CUSTOMER';
+        }
+        $chargeMode = strtoupper((string) ($delivery_quote['fee_charge_mode'] ?? 'CUSTOMER_TO_DRIVER'));
+        if (!in_array($chargeMode, ['CUSTOMER_TO_DRIVER', 'RECORD_ONLY', 'MERCHANT_COLLECT'], true)) {
+            $chargeMode = 'CUSTOMER_TO_DRIVER';
+        }
+
+        $this->db->insert('pos_online_food_delivery_order', [
+            'order_id' => $order_id,
+            'member_id' => $member_id > 0 ? $member_id : null,
+            'saved_location_id' => (int) ($delivery_quote['saved_location_id'] ?? 0) > 0 ? (int) $delivery_quote['saved_location_id'] : null,
+            'delivery_status' => 'PENDING',
+            'delivery_provider' => 'OJEK_ONLINE',
+            'fee_charge_mode' => $chargeMode,
+            'fee_paid_by' => $paidBy,
+            'fee_amount' => $fee,
+            'estimated_fee_amount' => $estimatedFee,
+            'distance_km' => isset($delivery_quote['distance_km']) ? round((float) $delivery_quote['distance_km'], 3) : null,
+            'straight_distance_km' => isset($delivery_quote['straight_distance_km']) ? round((float) $delivery_quote['straight_distance_km'], 3) : null,
+            'route_distance_km' => isset($delivery_quote['route_distance_km']) ? round((float) $delivery_quote['route_distance_km'], 3) : null,
+            'duration_min' => isset($delivery_quote['duration_min']) ? round((float) $delivery_quote['duration_min'], 2) : null,
+            'route_source' => $this->nullable_text($delivery_quote['source'] ?? ''),
+            'recipient_name' => $this->nullable_text($delivery_quote['recipient_name'] ?? ''),
+            'recipient_phone' => $this->nullable_text($delivery_quote['recipient_phone'] ?? ''),
+            'delivery_address' => $this->nullable_text($delivery_quote['address'] ?? ''),
+            'address_note' => $this->nullable_text($delivery_quote['address_note'] ?? ''),
+            'customer_lat' => isset($delivery_quote['customer_lat']) ? round((float) $delivery_quote['customer_lat'], 7) : null,
+            'customer_lng' => isset($delivery_quote['customer_lng']) ? round((float) $delivery_quote['customer_lng'], 7) : null,
+            'customer_location_accuracy' => isset($delivery_quote['customer_location_accuracy']) ? round((float) $delivery_quote['customer_location_accuracy'], 2) : null,
+            'free_reason' => $this->nullable_text($delivery_quote['free_reason'] ?? ''),
+        ]);
     }
 
     public function mark_paid($pending_id, $provider = 'DUMMY', $ref = null)

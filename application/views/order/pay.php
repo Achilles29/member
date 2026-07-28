@@ -7,6 +7,9 @@ $catatan_placeholder = $catatan_placeholder ?? 'Contoh: tanpa es, kurang manis, 
 $selected_payment_method = strtoupper((string) ($payment_method ?? 'KASIR'));
 $manual_payment_enabled = $manual_payment_enabled ?? true;
 $manual_payment_instructions = trim((string) ($manual_payment_instructions ?? ''));
+$delivery_fee = (float) ($delivery_fee ?? 0);
+$subtotal = array_key_exists('subtotal', get_defined_vars()) ? (float) $subtotal : max(0, (float) ($total ?? 0) - $delivery_fee);
+$delivery_quote = is_array($delivery_quote ?? null) ? $delivery_quote : [];
 ?>
 <div class="page-content nm-page nm-order">
   <div class="nm-topbar nm-topbar--mini">
@@ -32,6 +35,19 @@ $manual_payment_instructions = trim((string) ($manual_payment_instructions ?? ''
   <?php endif; ?>
 
   <div class="nm-card" style="margin-top:-22px;">
+    <?php if (!empty($is_online_order)): ?>
+      <div class="nm-order__totalRow">
+        <span>Subtotal menu</span>
+        <strong>Rp <?= number_format($subtotal, 0, ',', '.') ?></strong>
+      </div>
+      <div class="nm-order__totalRow">
+        <span>Ongkir delivery</span>
+        <strong>Rp <?= number_format($delivery_fee, 0, ',', '.') ?></strong>
+      </div>
+      <div class="nm-order__hint" style="margin-top:6px;">
+        Ongkir dicatat terpisah dari sales POS.
+      </div>
+    <?php endif; ?>
     <div class="nm-order__totalRow">
       <span>Total</span>
       <strong>Rp <?= number_format((float) ($total ?? 0), 0, ',', '.') ?></strong>
@@ -46,6 +62,11 @@ $manual_payment_instructions = trim((string) ($manual_payment_instructions ?? ''
       <input type="hidden" name="customer_lat" id="customer_lat">
       <input type="hidden" name="customer_lng" id="customer_lng">
       <input type="hidden" name="customer_location_accuracy" id="customer_location_accuracy">
+      <input type="hidden" name="customer_address" id="customer_address">
+      <input type="hidden" name="saved_location_id" id="saved_location_id" value="<?= (int) ($delivery_quote['saved_location_id'] ?? 0) ?>">
+      <input type="hidden" name="recipient_name" id="recipient_name" value="<?= html_escape((string) ($delivery_quote['recipient_name'] ?? '')) ?>">
+      <input type="hidden" name="recipient_phone" id="recipient_phone" value="<?= html_escape((string) ($delivery_quote['recipient_phone'] ?? '')) ?>">
+      <input type="hidden" name="address_note" id="address_note" value="<?= html_escape((string) ($delivery_quote['address_note'] ?? '')) ?>">
     <?php endif; ?>
     <div class="nm-card">
       <div class="nm-form">
@@ -101,6 +122,11 @@ $manual_payment_instructions = trim((string) ($manual_payment_instructions ?? ''
     const latEl = document.getElementById('customer_lat');
     const lngEl = document.getElementById('customer_lng');
     const accEl = document.getElementById('customer_location_accuracy');
+    const addressEl = document.getElementById('customer_address');
+    const savedLocationEl = document.getElementById('saved_location_id');
+    const recipientNameEl = document.getElementById('recipient_name');
+    const recipientPhoneEl = document.getElementById('recipient_phone');
+    const addressNoteEl = document.getElementById('address_note');
     function fillLocation() {
       try {
         const loc = JSON.parse(localStorage.getItem(LOCATION_KEY) || 'null');
@@ -110,6 +136,11 @@ $manual_payment_instructions = trim((string) ($manual_payment_instructions ?? ''
         latEl.value = String(lat);
         lngEl.value = String(lng);
         accEl.value = String(Number(loc.accuracy || 0));
+        if (addressEl) addressEl.value = String(loc.address || '');
+        if (savedLocationEl) savedLocationEl.value = String(Number(loc.saved_location_id || savedLocationEl.value || 0));
+        if (recipientNameEl && loc.recipient_name) recipientNameEl.value = String(loc.recipient_name || '');
+        if (recipientPhoneEl && loc.recipient_phone) recipientPhoneEl.value = String(loc.recipient_phone || '');
+        if (addressNoteEl && loc.address_note) addressNoteEl.value = String(loc.address_note || '');
         return true;
       } catch (_) {
         return false;
