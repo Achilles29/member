@@ -30,10 +30,11 @@ $storage_suffix = $order_storage_suffix ?? 'online';
     position:absolute;
     left:50%;
     transform:translateX(-50%);
-    bottom:0;
-    width:100%;
-    max-width:420px;
-    max-height:88vh;
+    bottom:calc(env(safe-area-inset-bottom, 0px));
+    width:calc(100% - 16px);
+    max-width:404px;
+    height:min(92dvh, calc(100dvh - 14px));
+    max-height:min(92dvh, calc(100dvh - 14px));
     overflow:hidden;
     display:flex;
     flex-direction:column;
@@ -41,10 +42,20 @@ $storage_suffix = $order_storage_suffix ?? 'online';
     border-radius:22px 22px 0 0;
     box-shadow:var(--shadow);
   }
+  @supports not (height: 1dvh) {
+    .nm-address-popup__panel { height:88vh; max-height:88vh; }
+  }
   .nm-address-popup__head { padding:14px 14px 10px; display:flex; justify-content:space-between; align-items:center; gap:10px; border-bottom:1px solid #f3f4f6; }
   .nm-address-popup__title { font-weight:1000; font-size:15px; }
-  .nm-address-popup__body { padding:14px; overflow:auto; display:grid; gap:10px; }
-  .nm-address-popup__foot { padding:12px 14px 14px; border-top:1px solid #f3f4f6; display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .nm-address-popup__body { padding:14px; overflow:auto; -webkit-overflow-scrolling:touch; display:grid; gap:10px; min-height:0; }
+  .nm-address-popup__foot {
+    padding:12px 14px calc(14px + env(safe-area-inset-bottom, 0px));
+    border-top:1px solid #f3f4f6;
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+    background:#fff;
+  }
   .nm-address-field label { display:block; font-size:11px; color:var(--muted); font-weight:1000; margin-bottom:5px; }
   .nm-address-field input, .nm-address-field textarea, .nm-address-field select {
     width:100%;
@@ -57,7 +68,7 @@ $storage_suffix = $order_storage_suffix ?? 'online';
   }
   .nm-address-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
   .nm-address-map-tools { display:grid; grid-template-columns:1fr auto; gap:8px; }
-  .nm-address-map { height:260px; border-radius:16px; overflow:hidden; border:1px solid rgba(54,42,35,.12); background:#eef2ec; }
+  .nm-address-map { height:220px; border-radius:16px; overflow:hidden; border:1px solid rgba(54,42,35,.12); background:#eef2ec; }
   .nm-address-search-results { border:1px solid rgba(54,42,35,.12); border-radius:14px; overflow:hidden; background:#fff; }
   .nm-address-search-result { width:100%; border:0; background:#fff; text-align:left; padding:10px 12px; border-bottom:1px solid rgba(54,42,35,.08); }
   .nm-address-search-result:last-child { border-bottom:0; }
@@ -83,6 +94,7 @@ $storage_suffix = $order_storage_suffix ?? 'online';
   @media (max-width: 380px) {
     .nm-address-actions { grid-template-columns:1fr; }
     .nm-address-map-tools, .nm-address-grid { grid-template-columns:1fr; }
+    .nm-address-map { height:190px; }
   }
 </style>
 

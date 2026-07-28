@@ -633,8 +633,8 @@ class Order extends CI_Controller
             'subtotal' => $subtotal,
             'delivery_fee' => round($fee, 2),
             'estimated_delivery_fee' => round($fee, 2),
-            'grand_total' => $subtotal,
-            'customer_pay_total' => $subtotal,
+            'grand_total' => $subtotal + ($feePaidBy === 'FREE' ? 0 : round($fee, 2)),
+            'customer_pay_total' => $subtotal + ($feePaidBy === 'FREE' ? 0 : round($fee, 2)),
             'fee_charge_mode' => $chargeMode,
             'fee_paid_by' => $feePaidBy,
             'free_reason' => $freeReason,
@@ -899,7 +899,46 @@ class Order extends CI_Controller
                 ];
             }
         }
+        $delivery = $this->db->table_exists('pos_online_food_delivery_order')
+            ? $this->db->select('fee_amount, fee_paid_by')
+                ->from('pos_online_food_delivery_order')
+                ->where('order_id', $pending_id)
+                ->limit(1)
+                ->get()
+                ->row_array()
+            : [];
+        $deliveryFee = max(0, (float) ($delivery['fee_amount'] ?? 0));
+        $deliveryPaidBy = strtoupper((string) ($delivery['fee_paid_by'] ?? 'CUSTOMER'));
+        if ($deliveryFee > 0 && $deliveryPaidBy !== 'FREE') {
+            $items[] = [
+                'id' => 'DELIVERY-FEE',
+                'name' => 'Ongkir delivery',
+                'price' => (int) round($deliveryFee),
+                'quantity' => 1,
+            ];
+        }
         return $items;
+    }
+
+    private function online_order_customer_pay_amount(array $order)
+    {
+        $amount = max(0, (float) ($order['total_penjualan'] ?? $order['grand_total'] ?? 0));
+        if (strtoupper((string) ($order['order_channel'] ?? '')) !== 'DELIVERY' || !$this->db->table_exists('pos_online_food_delivery_order')) {
+            return $amount;
+        }
+
+        $delivery = $this->db->select('fee_amount, fee_paid_by')
+            ->from('pos_online_food_delivery_order')
+            ->where('order_id', (int) ($order['id'] ?? 0))
+            ->limit(1)
+            ->get()
+            ->row_array();
+        $deliveryFee = max(0, (float) ($delivery['fee_amount'] ?? 0));
+        $deliveryPaidBy = strtoupper((string) ($delivery['fee_paid_by'] ?? 'CUSTOMER'));
+        if ($deliveryFee > 0 && $deliveryPaidBy !== 'FREE') {
+            $amount += $deliveryFee;
+        }
+        return $amount;
     }
 
     private function get_member_row($member_id)
@@ -1800,7 +1839,9 @@ class Order extends CI_Controller
                 $this->redirect_order('review_session');
                 return;
             }
-            $total = $subtotal;
+            $deliveryFee = max(0, (float) ($deliveryQuote['delivery_fee'] ?? 0));
+            $feePaidBy = strtoupper((string) ($deliveryQuote['fee_paid_by'] ?? ($deliveryFee <= 0 ? 'FREE' : 'CUSTOMER')));
+            $total = $subtotal + ($feePaidBy === 'FREE' ? 0 : $deliveryFee);
             $this->set_order_session('total', $total);
         }
 
@@ -1833,7 +1874,7 @@ class Order extends CI_Controller
             'qris_enabled' => $qrisPaymentEnabled,
             'cash_payment_label' => $this->is_online_order_flow() ? 'Manual admin / konfirmasi WA' : 'Bayar di kasir',
             'payment_hint' => $this->is_online_order_flow()
-                ? 'Total POS hanya menu. Ongkir tercatat sebagai biaya delivery terpisah.'
+                ? 'Tagihan customer termasuk ongkir bila tidak gratis. Nilai sales POS tetap hanya menu; ongkir dicatat di delivery.'
                 : 'Pilih metode pembayaran. Default: bayar di kasir. QRIS via Midtrans.',
             'manual_payment_instructions' => (string) ($onlineSettings['manual_payment_instructions'] ?? ''),
             'catatan_placeholder' => $this->is_online_order_flow()
@@ -2084,7 +2125,7 @@ class Order extends CI_Controller
         if (empty($payment_ref)) {
             $midtrans_order_id = $this->midtrans_build_order_id($pending_id);
 
-            $gross_amount = (int) round((float) ($order['total_penjualan'] ?? 0));
+            $gross_amount = (int) round($this->online_order_customer_pay_amount((array) $order));
             if ($gross_amount <= 0) {
                 show_error('Total order tidak valid.', 400);
                 return;

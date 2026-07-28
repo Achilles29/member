@@ -568,9 +568,12 @@ body{
   border-radius:22px;
   box-shadow:var(--shadow);
   overflow:hidden;
-  max-height:82vh;
+  max-height:min(88dvh, calc(100dvh - 28px));
   display:flex;
   flex-direction:column;
+}
+@supports not (height: 1dvh) {
+  .nm-popup__panel{ max-height:88vh; }
 }
 .nm-popup__head{
   padding:14px 14px;
@@ -586,6 +589,8 @@ body{
   padding:14px 14px 10px;
   overflow:auto;
   -webkit-overflow-scrolling:touch;
+  flex:1;
+  min-height:0;
 }
 .nm-popup__desc{
   margin:0 0 14px;
@@ -658,7 +663,12 @@ body{
 .nm-popup__noteInput::placeholder{
   color:#9ca3af;
 }
-.nm-popup__foot{ padding:12px 14px 14px; border-top:1px solid #f3f4f6; }
+.nm-popup__foot{
+  flex-shrink:0;
+  padding:12px 14px calc(14px + env(safe-area-inset-bottom, 0px));
+  border-top:1px solid #f3f4f6;
+  background:#fff;
+}
 
 .nm-btn{
   border:none;

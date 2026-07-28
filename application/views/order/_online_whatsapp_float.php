@@ -6,7 +6,7 @@ if ($waUrl !== ''):
   .nm-wa-float {
     position: fixed;
     right: 18px;
-    bottom: 86px;
+    bottom: 154px;
     z-index: 1200;
     width: 54px;
     height: 54px;
@@ -20,6 +20,8 @@ if ($waUrl !== ''):
     text-decoration: none;
     font-weight: 900;
     letter-spacing: 0;
+    touch-action: none;
+    user-select: none;
   }
   .nm-wa-float span {
     width: 28px;
@@ -35,4 +37,83 @@ if ($waUrl !== ''):
     </svg>
   </span>
 </a>
+<script>
+(function () {
+  const btn = document.querySelector('.nm-wa-float');
+  if (!btn) return;
+  const key = 'nm_wa_float_pos_v1';
+  let dragging = false;
+  let moved = false;
+  let startX = 0;
+  let startY = 0;
+  let startLeft = 0;
+  let startTop = 0;
+
+  function viewport() {
+    const vv = window.visualViewport;
+    return {
+      width: vv && vv.width ? vv.width : window.innerWidth,
+      height: vv && vv.height ? vv.height : window.innerHeight,
+      offsetLeft: vv && vv.offsetLeft ? vv.offsetLeft : 0,
+      offsetTop: vv && vv.offsetTop ? vv.offsetTop : 0
+    };
+  }
+  function clamp(left, top) {
+    const vp = viewport();
+    const size = 54;
+    const margin = 10;
+    return {
+      left: Math.max(vp.offsetLeft + margin, Math.min(left, vp.offsetLeft + vp.width - size - margin)),
+      top: Math.max(vp.offsetTop + margin, Math.min(top, vp.offsetTop + vp.height - size - margin))
+    };
+  }
+  function apply(left, top) {
+    const p = clamp(left, top);
+    btn.style.left = p.left + 'px';
+    btn.style.top = p.top + 'px';
+    btn.style.right = 'auto';
+    btn.style.bottom = 'auto';
+  }
+  try {
+    const saved = JSON.parse(localStorage.getItem(key) || 'null');
+    if (saved && Number.isFinite(Number(saved.left)) && Number.isFinite(Number(saved.top))) {
+      apply(Number(saved.left), Number(saved.top));
+    }
+  } catch (_) {}
+
+  btn.addEventListener('pointerdown', function (event) {
+    dragging = true;
+    moved = false;
+    const rect = btn.getBoundingClientRect();
+    startX = event.clientX;
+    startY = event.clientY;
+    startLeft = rect.left;
+    startTop = rect.top;
+    btn.setPointerCapture && btn.setPointerCapture(event.pointerId);
+  });
+  btn.addEventListener('pointermove', function (event) {
+    if (!dragging) return;
+    const dx = event.clientX - startX;
+    const dy = event.clientY - startY;
+    if (Math.abs(dx) + Math.abs(dy) > 4) moved = true;
+    apply(startLeft + dx, startTop + dy);
+  });
+  btn.addEventListener('pointerup', function () {
+    if (!dragging) return;
+    dragging = false;
+    const rect = btn.getBoundingClientRect();
+    try { localStorage.setItem(key, JSON.stringify({ left: rect.left, top: rect.top })); } catch (_) {}
+  });
+  btn.addEventListener('click', function (event) {
+    if (!moved) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setTimeout(function () { moved = false; }, 50);
+  });
+  window.addEventListener('resize', function () {
+    const rect = btn.getBoundingClientRect();
+    apply(rect.left, rect.top);
+  });
+})();
+</script>
 <?php endif; ?>
