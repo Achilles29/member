@@ -111,6 +111,10 @@
       <div class="ico ico--purple"><i class="f7-icons">cart</i></div>
       <span><?= $has_self_order_context ? 'Order' : 'Online' ?></span>
     </a>
+    <a class="nm-action" href="<?= site_url('online-order/addresses') ?>">
+      <div class="ico ico--teal"><i class="f7-icons">map_pin_ellipse</i></div>
+      <span>Alamat</span>
+    </a>
     <?php endif; ?>
     <a class="nm-action" href="<?= site_url('redeem') ?>">
       <div class="ico ico--green"><i class="f7-icons">gift</i></div>

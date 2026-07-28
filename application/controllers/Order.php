@@ -131,7 +131,7 @@ class Order extends CI_Controller
 
     private function online_order_method_allowed_when_closed($method)
     {
-        return in_array((string) $method, ['qris', 'qris_status', 'selesai', 'midtrans_callback'], true);
+        return in_array((string) $method, ['qris', 'qris_status', 'selesai', 'midtrans_callback', 'addresses', 'address_save', 'address_delete', 'address_default'], true);
     }
 
     private function online_food_availability()
@@ -382,7 +382,7 @@ class Order extends CI_Controller
         }
 
         return $this->db
-            ->select('id, label, recipient_name, recipient_phone, address, address_note, latitude, longitude, location_accuracy, is_default, free_delivery_enabled, free_delivery_reason')
+            ->select('id, label, recipient_name, recipient_phone, address, address_note, latitude, longitude, location_accuracy, is_default, free_delivery_enabled, free_delivery_reason, last_used_at, created_at, updated_at')
             ->from('crm_member_delivery_location')
             ->where('member_id', $member_id)
             ->order_by('is_default', 'DESC')
@@ -447,6 +447,81 @@ class Order extends CI_Controller
         $row['is_default'] = count($this->member_delivery_locations($member_id)) === 0 ? 1 : 0;
         $this->db->insert('crm_member_delivery_location', $row);
         return (int) $this->db->insert_id();
+    }
+
+    private function save_member_delivery_address_direct($member_id, array $payload)
+    {
+        $member_id = (int) $member_id;
+        if ($member_id <= 0 || !$this->db->table_exists('crm_member_delivery_location')) {
+            return ['ok' => false, 'message' => 'Tabel alamat belum tersedia.'];
+        }
+
+        $id = (int) ($payload['id'] ?? 0);
+        $existing = [];
+        if ($id > 0) {
+            $existing = $this->member_delivery_location($member_id, $id);
+            if (!$existing) {
+                return ['ok' => false, 'message' => 'Alamat tidak ditemukan.'];
+            }
+        }
+
+        $label = trim((string) ($payload['label'] ?? ''));
+        $address = trim((string) ($payload['address'] ?? ''));
+        $lat = $this->normalize_location_input($payload['latitude'] ?? '', $payload['longitude'] ?? '', $payload['location_accuracy'] ?? 0);
+        if ($label === '') {
+            return ['ok' => false, 'message' => 'Label alamat wajib diisi.'];
+        }
+        if ($address === '') {
+            return ['ok' => false, 'message' => 'Alamat wajib diisi.'];
+        }
+        if (!$lat) {
+            return ['ok' => false, 'message' => 'Titik lokasi belum valid.'];
+        }
+
+        $row = [
+            'member_id' => $member_id,
+            'label' => substr($label, 0, 80),
+            'recipient_name' => $this->nullable_text($payload['recipient_name'] ?? ''),
+            'recipient_phone' => $this->nullable_text($payload['recipient_phone'] ?? ''),
+            'address' => substr($address, 0, 255),
+            'address_note' => $this->nullable_text(substr(trim((string) ($payload['address_note'] ?? '')), 0, 255)),
+            'latitude' => round((float) $lat['lat'], 7),
+            'longitude' => round((float) $lat['lng'], 7),
+            'location_accuracy' => round((float) ($lat['accuracy'] ?? 0), 2),
+            'is_default' => (int) ($payload['is_default'] ?? 0) === 1 ? 1 : 0,
+            'updated_at' => date('Y-m-d H:i:s'),
+        ];
+
+        $this->db->trans_begin();
+        try {
+            if ((int) $row['is_default'] === 1) {
+                $this->db->where('member_id', $member_id);
+                if ($id > 0) {
+                    $this->db->where('id !=', $id);
+                }
+                $this->db->update('crm_member_delivery_location', ['is_default' => 0]);
+            }
+
+            if ($id > 0) {
+                $this->db->where('id', $id)->where('member_id', $member_id)->update('crm_member_delivery_location', $row);
+            } else {
+                if (count($this->member_delivery_locations($member_id)) === 0) {
+                    $row['is_default'] = 1;
+                }
+                $row['created_at'] = date('Y-m-d H:i:s');
+                $this->db->insert('crm_member_delivery_location', $row);
+                $id = (int) $this->db->insert_id();
+            }
+
+            if ($this->db->trans_status() === false) {
+                throw new RuntimeException('Gagal menyimpan alamat.');
+            }
+            $this->db->trans_commit();
+            return ['ok' => true, 'id' => $id];
+        } catch (Throwable $e) {
+            $this->db->trans_rollback();
+            return ['ok' => false, 'message' => $e->getMessage()];
+        }
     }
 
     private function online_haversine_km($lat1, $lng1, $lat2, $lng2)
@@ -1324,6 +1399,75 @@ class Order extends CI_Controller
         $this->unset_order_session(['draft_cart', 'draft_total', 'cart', 'total', 'flow_step', 'delivery_quote']);
 
         $this->redirect_order();
+    }
+
+    public function addresses()
+    {
+        if (!$this->is_online_order_flow()) {
+            redirect('online-order/addresses');
+            return;
+        }
+
+        $member_id = (int) $this->session->userdata('member_id');
+        $data = $this->order_view_data([
+            'title' => 'Alamat Tersimpan',
+            'active_menu' => 'addresses',
+            'saved_locations' => $this->member_delivery_locations($member_id),
+            'delivery_config' => $this->online_delivery_public_config(),
+        ]);
+
+        $this->load->view('templates/member/header', $data);
+        $this->load->view('order/locations', $data);
+        $this->load->view('templates/member/footer', $data);
+    }
+
+    public function address_save()
+    {
+        if (!$this->is_online_order_flow()) {
+            $this->json_response(['ok' => false, 'message' => 'Alamat delivery hanya untuk online order.'], 400);
+            return;
+        }
+
+        $member_id = (int) $this->session->userdata('member_id');
+        $result = $this->save_member_delivery_address_direct($member_id, $this->input->post(null, true) ?: []);
+        $this->json_response($result, !empty($result['ok']) ? 200 : 422);
+    }
+
+    public function address_delete($id)
+    {
+        if (!$this->is_online_order_flow()) {
+            $this->json_response(['ok' => false, 'message' => 'Alamat delivery hanya untuk online order.'], 400);
+            return;
+        }
+
+        $member_id = (int) $this->session->userdata('member_id');
+        $id = (int) $id;
+        if ($member_id <= 0 || $id <= 0 || !$this->member_delivery_location($member_id, $id)) {
+            $this->json_response(['ok' => false, 'message' => 'Alamat tidak ditemukan.'], 404);
+            return;
+        }
+
+        $this->db->where('id', $id)->where('member_id', $member_id)->delete('crm_member_delivery_location');
+        $this->json_response(['ok' => true, 'id' => $id]);
+    }
+
+    public function address_default($id)
+    {
+        if (!$this->is_online_order_flow()) {
+            $this->json_response(['ok' => false, 'message' => 'Alamat delivery hanya untuk online order.'], 400);
+            return;
+        }
+
+        $member_id = (int) $this->session->userdata('member_id');
+        $id = (int) $id;
+        if ($member_id <= 0 || $id <= 0 || !$this->member_delivery_location($member_id, $id)) {
+            $this->json_response(['ok' => false, 'message' => 'Alamat tidak ditemukan.'], 404);
+            return;
+        }
+
+        $this->db->where('member_id', $member_id)->update('crm_member_delivery_location', ['is_default' => 0]);
+        $this->db->where('id', $id)->where('member_id', $member_id)->update('crm_member_delivery_location', ['is_default' => 1]);
+        $this->json_response(['ok' => true, 'id' => $id]);
     }
 
     public function menu()

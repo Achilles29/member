@@ -39,7 +39,7 @@ $grand_total = (float) ($delivery_quote['grand_total'] ?? ((float) ($total ?? 0)
   }
 </style>
 <?php endif; ?>
-<div class="page-content nm-page nm-order">
+<div class="page-content nm-page nm-order nm-order--review-sticky">
   <div class="nm-topbar nm-topbar--mini">
     <div>
       <div class="nm-name"><?= html_escape($title ?? 'Review Order') ?></div>
@@ -90,6 +90,10 @@ $grand_total = (float) ($delivery_quote['grand_total'] ?? ((float) ($total ?? 0)
     <?php if ($is_online_order): ?>
       <div class="nm-order__hint" id="nmReviewLocationStatus">Tentukan lokasi pengantaran untuk menghitung rute dan ongkir.</div>
       <?php if (!empty($saved_locations)): ?>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px;">
+          <div class="nm-order__hint" style="margin-top:0;">Alamat tersimpan</div>
+          <a href="<?= base_url($order_base_path . '/addresses') ?>" style="font-size:12px;font-weight:900;color:var(--primary);text-decoration:none;">Kelola</a>
+        </div>
         <div class="nm-location-list" id="nmSavedLocations">
           <?php foreach ($saved_locations as $loc): ?>
             <button
@@ -108,6 +112,10 @@ $grand_total = (float) ($delivery_quote['grand_total'] ?? ((float) ($total ?? 0)
               <span><?= html_escape((string) ($loc['address'] ?? '')) ?></span>
             </button>
           <?php endforeach; ?>
+        </div>
+      <?php else: ?>
+        <div style="display:flex;justify-content:flex-end;margin-top:8px;">
+          <a href="<?= base_url($order_base_path . '/addresses') ?>" style="font-size:12px;font-weight:900;color:var(--primary);text-decoration:none;">Tambah alamat tersimpan</a>
         </div>
       <?php endif; ?>
       <div class="nm-delivery-tools">
@@ -164,6 +172,7 @@ $grand_total = (float) ($delivery_quote['grand_total'] ?? ((float) ($total ?? 0)
     </div>
     <div class="nm-order__reviewActions">
       <a class="nm-btn nm-btn--ghost" id="nmAddMenu" href="<?= base_url($order_base_path . '/menu') ?>">Tambah menu</a>
+      <button type="button" class="nm-btn nm-btn--danger" id="nmReviewClear">Kosongkan</button>
       <a class="nm-btn nm-btn--primary" id="nmReviewPay" href="<?= base_url($order_base_path . '/pay') ?>">Bayar</a>
     </div>
   </div>
@@ -184,6 +193,7 @@ $grand_total = (float) ($delivery_quote['grand_total'] ?? ((float) ($total ?? 0)
     const LOCATION_KEY = 'nm_order_location_v1_' + STORAGE_SUFFIX;
     const QUOTE_KEY = 'nm_order_delivery_quote_v1_' + STORAGE_SUFFIX;
     const DELIVERY_QUOTE_URL = <?= json_encode(base_url($order_base_path . '/delivery_quote'), JSON_UNESCAPED_SLASHES) ?>;
+    const CLEAR_CART_URL = <?= json_encode(base_url($order_base_path . '/clear_cart'), JSON_UNESCAPED_SLASHES) ?>;
     const SUBTOTAL = <?= json_encode((float) ($total ?? 0)) ?>;
     const SERVER_QUOTE = <?= json_encode($delivery_quote, JSON_UNESCAPED_SLASHES) ?>;
     const SAVED_LOCATIONS = <?= json_encode($saved_locations, JSON_UNESCAPED_SLASHES) ?>;
@@ -202,6 +212,19 @@ $grand_total = (float) ($delivery_quote['grand_total'] ?? ((float) ($total ?? 0)
     if (btn) {
       btn.addEventListener('click', function () {
         try { localStorage.setItem(STEP_KEY, 'menu'); } catch (_) {}
+      });
+    }
+    const clearBtn = document.getElementById('nmReviewClear');
+    if (clearBtn) {
+      clearBtn.addEventListener('click', function () {
+        if (!confirm('Kosongkan keranjang dan pilih ulang menu?')) return;
+        try {
+          localStorage.removeItem('nm_order_cart_v1_' + STORAGE_SUFFIX);
+          localStorage.removeItem(STEP_KEY);
+          localStorage.removeItem(QUOTE_KEY);
+          localStorage.removeItem(LOCATION_KEY);
+        } catch (_) {}
+        window.location.href = CLEAR_CART_URL;
       });
     }
 

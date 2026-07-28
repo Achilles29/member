@@ -28,6 +28,13 @@ $has_self_order_context = (int) ($ci->session->userdata('order_meja_id') ?? 0) >
     </a>
     <?php endif; ?>
 
+    <?php if ($self_order_available): ?>
+    <a href="<?= site_url('online-order/addresses') ?>" class="tab-link <?= ($active_menu ?? '') === 'addresses' ? 'tab-link-active' : '' ?>">
+      <i class="f7-icons">map_pin_ellipse</i>
+      <span class="tabbar-label">Alamat</span>
+    </a>
+    <?php endif; ?>
+
     <a href="<?= site_url('loyalitas') ?>" class="tab-link <?= in_array(($active_menu ?? ''), ['reward','poin','stamp','voucher']) ? 'tab-link-active' : '' ?>">
       <i class="f7-icons">rosette</i>
       <span class="tabbar-label">Reward</span>

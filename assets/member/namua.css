@@ -675,6 +675,7 @@ body{
 .nm-btn--block{ width:100%; }
 .nm-btn--primary{ background:linear-gradient(135deg,var(--primary),var(--primary2)); color:#fff; }
 .nm-btn--ghost{ background:#f3f4f6; color:#111827; }
+.nm-btn--danger{ background:#fee2e2; color:#7f1d1d; }
 
 .nm-order__category{
   padding:0;
@@ -740,7 +741,30 @@ body{
   align-items:center;
   font-weight:1000;
 }
-.nm-order__reviewActions{ margin-top:12px; display:flex; gap:10px; }
+.nm-order--review-sticky{ padding-bottom:168px !important; }
+.nm-order__reviewActions{
+  position:fixed;
+  left:50%;
+  transform:translateX(-50%);
+  bottom:74px;
+  width:calc(100% - 28px);
+  max-width:392px;
+  z-index:1000;
+  display:grid;
+  grid-template-columns:1fr .86fr 1fr;
+  gap:8px;
+  padding:10px;
+  border-radius:18px;
+  background:rgba(255,255,255,.96);
+  box-shadow:var(--shadow);
+  backdrop-filter:blur(10px);
+}
+.nm-order__reviewActions .nm-btn{
+  min-height:44px;
+  border-radius:14px;
+  padding:10px 8px;
+  white-space:nowrap;
+}
 .nm-order__hint{ margin-top:10px; color:var(--muted); font-size:12px; font-weight:800; }
 
 .nm-form__label{ font-weight:1000; font-size:12px; margin-bottom:10px; }
