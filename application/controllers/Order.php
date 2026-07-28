@@ -1004,7 +1004,9 @@ class Order extends CI_Controller
             ->from('mst_extra e')
             ->where('e.is_active', 1);
 
-        if ($this->db->field_exists('show_in_self_order', 'mst_extra')) {
+        if ($this->is_online_order_flow() && $this->db->field_exists('show_online_food', 'mst_extra')) {
+            $this->db->where('e.show_online_food', 1);
+        } elseif ($this->db->field_exists('show_in_self_order', 'mst_extra')) {
             $this->db->where('e.show_in_self_order', 1);
         }
 
@@ -1070,7 +1072,9 @@ class Order extends CI_Controller
         }
 
         $extra_join = 'e.id = gi.extra_id AND e.is_active = 1';
-        if ($this->db->field_exists('show_in_self_order', 'mst_extra')) {
+        if ($this->is_online_order_flow() && $this->db->field_exists('show_online_food', 'mst_extra')) {
+            $extra_join .= ' AND e.show_online_food = 1';
+        } elseif ($this->db->field_exists('show_in_self_order', 'mst_extra')) {
             $extra_join .= ' AND e.show_in_self_order = 1';
         }
 
