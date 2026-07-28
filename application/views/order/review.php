@@ -496,6 +496,7 @@ $grand_total = (float) ($delivery_quote['grand_total'] ?? ((float) ($total ?? 0)
     }
     const findAddress = document.getElementById('nmFindAddress');
     const resultBox = document.getElementById('nmSearchResults');
+    let searchTimer = null;
     function chooseSearchResult(loc) {
       selectedSavedLocationId = 0;
       saveLocation(loc);
@@ -526,6 +527,121 @@ $grand_total = (float) ($delivery_quote['grand_total'] ?? ((float) ($total ?? 0)
         if (row) chooseSearchResult(row);
       };
     }
+    function normalizePhotonRows(json, q) {
+      return (json && Array.isArray(json.features) ? json.features : []).map(function (row) {
+        const coords = row && row.geometry && Array.isArray(row.geometry.coordinates) ? row.geometry.coordinates : null;
+        if (!coords || coords.length < 2) return null;
+        const props = row.properties || {};
+        const label = [props.name, props.street, props.city, props.county, props.state, props.country]
+          .filter(function (part, idx, arr) { return part && arr.indexOf(part) === idx; })
+          .join(', ');
+        const lat = Number(coords[1]);
+        const lng = Number(coords[0]);
+        const near = Number.isFinite(Number(DELIVERY_CONFIG.outlet_lat)) && Number.isFinite(Number(DELIVERY_CONFIG.outlet_lng))
+          ? distanceKm(Number(DELIVERY_CONFIG.outlet_lat), Number(DELIVERY_CONFIG.outlet_lng), lat, lng)
+          : 0;
+        return {
+          lat: lat,
+          lng: lng,
+          accuracy: 0,
+          saved_location_id: 0,
+          title: String(props.name || props.street || 'Lokasi'),
+          address: String(label || q),
+          near_km: near,
+          at: new Date().toISOString()
+        };
+      }).filter(Boolean);
+    }
+    function normalizeNominatimRows(json, q) {
+      return (Array.isArray(json) ? json : []).map(function (row) {
+        const lat = Number(row && row.lat);
+        const lng = Number(row && row.lon);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+        const address = String(row.display_name || q);
+        const near = Number.isFinite(Number(DELIVERY_CONFIG.outlet_lat)) && Number.isFinite(Number(DELIVERY_CONFIG.outlet_lng))
+          ? distanceKm(Number(DELIVERY_CONFIG.outlet_lat), Number(DELIVERY_CONFIG.outlet_lng), lat, lng)
+          : 0;
+        return {
+          lat: lat,
+          lng: lng,
+          accuracy: 0,
+          saved_location_id: 0,
+          title: String(row.name || address.split(',')[0] || 'Lokasi'),
+          address: address,
+          near_km: near,
+          at: new Date().toISOString()
+        };
+      }).filter(Boolean);
+    }
+    function uniqueAndSortLocations(rows) {
+      const seen = {};
+      return rows.filter(function (row) {
+        const key = Number(row.lat).toFixed(5) + ',' + Number(row.lng).toFixed(5);
+        if (seen[key]) return false;
+        seen[key] = true;
+        return true;
+      }).sort(function (a, b) {
+        return Number(a.near_km || 0) - Number(b.near_km || 0);
+      }).slice(0, 8);
+    }
+    function manualLocationRow(q) {
+      const center = deliveryMap ? deliveryMap.getCenter() : null;
+      const loc = getLocation() || {};
+      const lat = Number(loc.lat || (center && center.lat) || DELIVERY_CONFIG.outlet_lat || -6.2);
+      const lng = Number(loc.lng || (center && center.lng) || DELIVERY_CONFIG.outlet_lng || 106.8166667);
+      const near = Number.isFinite(Number(DELIVERY_CONFIG.outlet_lat)) && Number.isFinite(Number(DELIVERY_CONFIG.outlet_lng))
+        ? distanceKm(Number(DELIVERY_CONFIG.outlet_lat), Number(DELIVERY_CONFIG.outlet_lng), lat, lng)
+        : 0;
+      return {
+        lat: lat,
+        lng: lng,
+        accuracy: Number(loc.accuracy || 0),
+        saved_location_id: 0,
+        title: 'Pakai teks ini',
+        address: q + ' - geser pin jika titik belum tepat',
+        near_km: near,
+        at: new Date().toISOString()
+      };
+    }
+    function searchLocations(q, quiet) {
+      q = String(q || '').trim();
+      if (q.length < 3) {
+        if (resultBox) resultBox.hidden = true;
+        return;
+      }
+      if (!quiet) setAlert('Mencari alamat...');
+      const nominatimUrl = 'https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=8&countrycodes=id&q=' + encodeURIComponent(q);
+      fetch(nominatimUrl, { headers: { 'Accept': 'application/json' } })
+        .then(function (res) { return res.json(); })
+        .then(function (nominatimJson) {
+          const nominatimRows = normalizeNominatimRows(nominatimJson, q);
+          let photonUrl = 'https://photon.komoot.io/api/?limit=6&q=' + encodeURIComponent(q);
+          if (Number.isFinite(Number(DELIVERY_CONFIG.outlet_lat)) && Number.isFinite(Number(DELIVERY_CONFIG.outlet_lng))) {
+            photonUrl += '&lat=' + encodeURIComponent(String(DELIVERY_CONFIG.outlet_lat)) + '&lon=' + encodeURIComponent(String(DELIVERY_CONFIG.outlet_lng));
+          }
+          return fetch(photonUrl, { headers: { 'Accept': 'application/json' } })
+            .then(function (res) { return res.json(); })
+            .catch(function () { return null; })
+            .then(function (photonJson) {
+              const rows = uniqueAndSortLocations(nominatimRows.concat(normalizePhotonRows(photonJson, q)));
+              rows.push(manualLocationRow(q));
+              setAlert('');
+              renderSearchResults(rows);
+            });
+        })
+        .catch(function () {
+          setAlert('');
+          renderSearchResults([manualLocationRow(q)]);
+        });
+    }
+    if (addressInput) {
+      addressInput.addEventListener('input', function () {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(function () {
+          searchLocations(addressInput.value, true);
+        }, 650);
+      });
+    }
     if (findAddress) {
       findAddress.addEventListener('click', function () {
         const q = String(addressInput && addressInput.value || '').trim();
@@ -533,50 +649,7 @@ $grand_total = (float) ($delivery_quote['grand_total'] ?? ((float) ($total ?? 0)
           setAlert('Tulis alamat atau patokan dulu.');
           return;
         }
-        setAlert('Mencari alamat...');
-        let url = 'https://photon.komoot.io/api/?limit=6&lang=id&q=' + encodeURIComponent(q);
-        if (Number.isFinite(Number(DELIVERY_CONFIG.outlet_lat)) && Number.isFinite(Number(DELIVERY_CONFIG.outlet_lng))) {
-          url += '&lat=' + encodeURIComponent(String(DELIVERY_CONFIG.outlet_lat)) + '&lon=' + encodeURIComponent(String(DELIVERY_CONFIG.outlet_lng));
-        }
-        fetch(url, {
-          headers: { 'Accept': 'application/json' }
-        }).then(function (res) {
-          return res.json();
-        }).then(function (json) {
-          const rows = (json && Array.isArray(json.features) ? json.features : []).map(function (row) {
-            const coords = row && row.geometry && Array.isArray(row.geometry.coordinates) ? row.geometry.coordinates : null;
-            if (!coords || coords.length < 2) return null;
-            const props = row.properties || {};
-            const label = [props.name, props.street, props.city, props.county, props.state, props.country]
-              .filter(function (part, idx, arr) { return part && arr.indexOf(part) === idx; })
-              .join(', ');
-            const lat = Number(coords[1]);
-            const lng = Number(coords[0]);
-            const near = Number.isFinite(Number(DELIVERY_CONFIG.outlet_lat)) && Number.isFinite(Number(DELIVERY_CONFIG.outlet_lng))
-              ? distanceKm(Number(DELIVERY_CONFIG.outlet_lat), Number(DELIVERY_CONFIG.outlet_lng), lat, lng)
-              : 0;
-            return {
-              lat: lat,
-              lng: lng,
-              accuracy: 0,
-              saved_location_id: 0,
-              title: String(props.name || props.street || 'Lokasi'),
-              address: String(label || q),
-              near_km: near,
-              at: new Date().toISOString()
-            };
-          }).filter(Boolean).sort(function (a, b) {
-            return Number(a.near_km || 0) - Number(b.near_km || 0);
-          });
-          if (!rows.length) {
-            setAlert('Alamat tidak ditemukan. Coba ketik lebih lengkap atau geser pin di map.');
-            return;
-          }
-          setAlert('');
-          renderSearchResults(rows);
-        }).catch(function () {
-          setAlert('Pencarian alamat belum tersedia. Pakai lokasi saya atau geser pin di map.');
-        });
+        searchLocations(q, false);
       });
     }
     const payBtn = document.getElementById('nmReviewPay');
